@@ -1,0 +1,25 @@
+{
+  "name": "pyrust",
+
+  "build": {
+      "dockerfile": "Dockerfile"
+  },
+
+  "customizations": {
+      "vscode":{
+          "extensions": [
+            "ms-python.python",
+            "rust-lang.rust-analyzer",
+            "vadimcn.vscode-lldb"
+          ]
+      }
+  },
+
+  // Enable container debugging
+  "capAdd": [
+      "SYS_PTRACE"
+  ],
+  "securityOpt": [
+    "seccomp=unconfined"
+  ]
+}
