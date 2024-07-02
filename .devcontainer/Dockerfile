@@ -1,27 +1,17 @@
-FROM python:3.12-bookworm
+FROM rust:1.79-bookworm
 
-# Dev packages
-RUN apt-get update && \
-    apt-get install -y build-essential curl && \
+RUN apt-get update
+RUN apt install -y --no-install-recommends \
+    cmake \
+    llvm-14-dev \
+    libpolly-14-dev \
+    libclang-14-dev \
+    python3.11-venv \
+    python3.11-dev \
+    && \
     rm -rf /var/lib/apt/lists/*
 
-# Get Rust
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y && \
-    echo 'source $HOME/.cargo/env' >> $HOME/.bashrc
-
-    #--no-install-recommends 
-# Dev tools 
-RUN apt-get update && \
-    apt-get install -y cmake git && \
-    rm -rf /var/lib/apt/lists/*
-
-# LLVM for building Enzyme
-RUN apt-get update && \
-    apt-get install -y llvm libpolly-14-dev libclang-14-dev && \
-    rm -rf /var/lib/apt/lists/*
-
-# Install maturin
-RUN python -m venv /venv
+RUN python3 -m venv /venv
 ENV VIRTUAL_ENV /venv
-ENV PATH /venv/bin:$PATH 
+ENV PATH /venv/bin:$PATH
 RUN pip install maturin
