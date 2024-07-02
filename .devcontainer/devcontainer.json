@@ -1,5 +1,5 @@
 {
-  "name": "pyrust",
+  "name": "py-diffsol",
 
   "build": {
       "dockerfile": "Dockerfile"
