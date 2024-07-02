@@ -9,6 +9,6 @@ name = "diffsol"
 [dependencies]
 diffsol = { version = "0.1.10", features = ["diffsl-llvm14"] }
 numpy = "0.21.0"
-pyo3 = { version = "0.21.0", features = ["extension-module"] }
+pyo3 = "0.21.0"
 ndarray = "0.15.0"
 nalgebra = "0.29.0"

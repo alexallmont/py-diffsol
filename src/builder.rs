@@ -18,6 +18,8 @@ use pyo3::{
     exceptions::PyRuntimeError
 };
 
+use super::problem::*;
+
 
 /// Builder for ODE problems. Use methods to set parameters and then call one of the build methods when done.
 // Implementation note: this uses RefCell to provide interior mutability in builder pattern; it circumvents
@@ -97,43 +99,27 @@ impl PyOdeBuilder {
     /// Build an OdeSolverProblem from a diffsl code string
     pub fn build_diffsl<'p>(
         slf: PyRefMut<'p, Self>,
-        code: &str
-    ) -> PyResult<isize> {
+        context: PyRef<'p, PyOdeSolverContext>
+    ) -> PyResult<PyOdeSolverProblem> {
         let guard = slf.0.lock().unwrap();
+        let ctx: &DiffSlContext = &context.0.lock().unwrap().context;
         let builder = guard.take();
-        let context = DiffSlContext::new(code).unwrap();
-        let _problem = builder.build_diffsl(&context).unwrap();
-        Ok(-1)
+        let problem = builder.build_diffsl(&ctx).unwrap();
+
+        Ok(PyOdeSolverProblem::create_problem_handle(
+            &context,
+            &ctx,
+            problem
+        ))
     }
 
-    /// WIP
-    pub fn wip_diffsl_solve<'p>(
-        slf: PyRefMut<'p, Self>,
-        code: &str
-    ) -> PyResult<PyObject> {
-        let guard = slf.0.lock().unwrap();
-        let builder = guard.take();
-        let context = DiffSlContext::new(code).unwrap();
-        let problem = builder.build_diffsl(&context).unwrap();
-
-        // WIP from diffsol ode_solver/diffsl.rs
-        let mut solver = Bdf::default();
-        let t = 0.4;
-        let state = OdeSolverState::new(&problem, &solver).unwrap();
-        solver.set_problem(state, &problem);
-        while solver.state().unwrap().t <= t {
-            solver.step().unwrap();
-        }
-        if let Ok(y) = solver.interpolate(t) {
-            let rows = y.nrows();
-            let cols = y.ncols();
-            let vec: Vec<f64> = y.iter().cloned().collect();
-            let array = Array2::from_shape_vec((rows, cols), vec).unwrap();
-            let py_array = PyArray2::from_owned_array_bound(slf.py(), array);
-            Ok(py_array.into_py(slf.py()).to_owned())
-        }
-        else {
-            Err(PyRuntimeError::new_err("FIXME"))
-        }
-    }
+    // FIXME TODO
+    // WIP from diffsol ode_solver/diffsl.rs
+    // let mut solver = Bdf::default();
+    // let t = 0.4;
+    // let state = OdeSolverState::new(&problem, &solver).unwrap();
+    // solver.set_problem(state, &problem);
+    // while solver.state().unwrap().t <= t {
+    //     solver.step().unwrap();
+    // }
 }

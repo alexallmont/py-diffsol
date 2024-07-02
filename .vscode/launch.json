@@ -10,10 +10,26 @@
             "name": "Run Python Test",
             "program": "/venv/bin/python",
             "args": [
-                "examples/diffsl.py"
+                "examples/wip_test.py"
             ],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "maturin develop"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Cargo test",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--lib",
+                    "--no-default-features",
+                    "test_run_python"
+                ]
+            },
+            "args": [
+            ]
         }
     ]
 }
