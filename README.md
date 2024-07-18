@@ -2,6 +2,17 @@
 
 Python wrapper for diffsol ODE solver library
 
+## TODO
+
+ - For review on Friday:
+   - DONE: pyoil wrapping builder, context, problem
+   - REVIEW: ideal python API?
+ - TODO
+   - Use released version of PyOil3
+   - Add GitHub actions
+   - Remove pub access?
+   - Review multithreaded access. Is sync/send safe?
+
 ## Example usage
 
     $ maturin develop

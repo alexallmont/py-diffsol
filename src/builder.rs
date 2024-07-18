@@ -1,53 +1,39 @@
 use std::cell::RefCell;
-use std::sync::{
-    Arc,
-    Mutex
-};
 
-use diffsol::{
-    DiffSlContext,
-    OdeBuilder,
-    OdeSolverState,
-    OdeSolverMethod,
-    Bdf
-};
-use numpy::PyArray2;
-use ndarray::Array2;
-use pyo3::{
-    prelude::*,
-    exceptions::PyRuntimeError
-};
+use diffsol::OdeBuilder;
+use pyo3::prelude::*;
+use pyoil3::pyoil3_class;
 
-use super::problem::*;
+use crate::problem::pyoil_problem;
 
-
-/// Builder for ODE problems. Use methods to set parameters and then call one of the build methods when done.
-// Implementation note: this uses RefCell to provide interior mutability in builder pattern; it circumvents
-// strictness in PyO3 when modifying and returning self.
-#[pyclass]
-#[pyo3(name = "OdeBuilder")]
-pub struct PyOdeBuilder(Arc<Mutex<RefCell<OdeBuilder>>>);
-
+// 
+type OdeBuilderRefCell = RefCell<OdeBuilder>;
+pyoil3_class!(
+    "OdeBuilder",
+    OdeBuilderRefCell,
+    pyoil_builder
+);
 
 // Call an OdeBuilder builder method on the container object. This allows for a builder/fluent
 // mechanism in PyO3 to an underlying builder class by taking the builder object, operating on
 // it with the `tx` lambda, and then replacing the original RefCell with the builder response.
 fn _apply_builder_fn<F: Fn(OdeBuilder) -> OdeBuilder>(
-    builder: &Arc<Mutex<RefCell<OdeBuilder>>>,
+    builder: &pyoil_builder::ArcHandle,
     tx: F
 ) {
     let cl = builder.clone();
-    let val = cl.lock().unwrap();
-    val.replace(tx(val.take()));
+    let builder = cl.lock().unwrap();
+    let transformed = tx(builder.instance.take());
+    builder.instance.replace(transformed);
 }
 
 
 /// Public OdeBuilder python methods
 #[pymethods]
-impl PyOdeBuilder {
+impl pyoil_builder::PyClass {
     #[new]
-    pub fn new() -> PyOdeBuilder {
-        PyOdeBuilder(Arc::new(Mutex::new(RefCell::new(OdeBuilder::new()))))
+    pub fn new() -> Self {
+        Self::bind_instance(RefCell::new(OdeBuilder::new()))
     }
 
     /// Set the initial time.
@@ -96,30 +82,21 @@ impl PyOdeBuilder {
         slf
     }
 
-    /// Build an OdeSolverProblem from a diffsl code string
+    /// Build an OdeSolverProblem from a diffsl code string given a context
     pub fn build_diffsl<'p>(
         slf: PyRefMut<'p, Self>,
-        context: PyRef<'p, PyOdeSolverContext>
-    ) -> PyResult<PyOdeSolverProblem> {
+        context: PyRef<'p, crate::context::pyoil_context::PyClass>
+    ) -> PyResult<pyoil_problem::PyClass> {
+        // FIXME replace unwraps
         let guard = slf.0.lock().unwrap();
-        let ctx: &DiffSlContext = &context.0.lock().unwrap().context;
-        let builder = guard.take();
-        let problem = builder.build_diffsl(&ctx).unwrap();
+        let instance = &context.0.lock().unwrap().instance;
+        let builder = guard.instance.take();
+        let problem = builder.build_diffsl(&instance).unwrap();
 
-        Ok(PyOdeSolverProblem::create_problem_handle(
-            &context,
-            &ctx,
-            problem
-        ))
+        let result = pyoil_problem::PyClass::bind_owned_instance(
+            problem,
+            context.0.clone()
+        );
+        Ok(result)
     }
-
-    // FIXME TODO
-    // WIP from diffsol ode_solver/diffsl.rs
-    // let mut solver = Bdf::default();
-    // let t = 0.4;
-    // let state = OdeSolverState::new(&problem, &solver).unwrap();
-    // solver.set_problem(state, &problem);
-    // while solver.state().unwrap().t <= t {
-    //     solver.step().unwrap();
-    // }
 }
