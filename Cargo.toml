@@ -11,5 +11,5 @@ diffsol = { version = "0.1.15", features = ["diffsl-llvm16" ] }
 numpy = "0.21.0"
 nalgebra = "0.33"
 pyo3 = { version = "0.21.0", features = ["extension-module"] }
-pyoil3 = { path = "./pyoil3" } # FIXME use git URI when public
+pyoil3 = { git = "https://github.com/alexallmont/pyoil3.git" }
 rust-numpy = "0.1.0"
