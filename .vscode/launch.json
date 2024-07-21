@@ -10,7 +10,7 @@
             "name": "Run Python Test",
             "program": "/venv/bin/python",
             "args": [
-                "examples/wip_test.py"
+                "examples/bdf_solve.py"
             ],
             "cwd": "${workspaceFolder}",
             "preLaunchTask": "maturin develop"
