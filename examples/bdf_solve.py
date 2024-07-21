@@ -12,14 +12,6 @@ context = diffsol.OdeSolverContext(
 
 builder = diffsol.OdeBuilder().rtol(1e-6).p([0.1]).h0(5.0)
 problem = builder.build_diffsl(context)
-
 solver = diffsol.Bdf()
 result = solver.solve(problem)
-
-print("t:")
-print(type(result.t))
-print(result.t)
-print()
-print("y:")
-print(type(result.y))
-print(result.y)
+print(result.t, result.y)
