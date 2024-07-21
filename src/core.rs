@@ -9,12 +9,11 @@ pub mod types {
     use diffsol::ode_solver::diffsl;
 
     /// Underlying value and matrix types.
+    // FIXME add faer::Mat and matrix::sparse_faer::SparseColMat
     pub type T = f64;
-    pub type M = diffsl::M;
+    pub type M = nalgebra::DMatrix<T>;
+    pub type V = <M as diffsol::matrix::MatrixCommon>::V;
 
     /// Eqn is required for solvers (with static lifetime for pyoil3).
-    pub type Eqn = diffsl::DiffSl<'static>;
-
-    /// Matrix type for passing results internally.
-    pub type SolveMatrixType = <diffsl::DiffSl<'static> as diffsol::OdeEquations>::V;
+    pub type Eqn<'a> = diffsl::DiffSl<'a, M>;
 }

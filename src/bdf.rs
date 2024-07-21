@@ -6,23 +6,26 @@ use diffsol::{
     NalgebraLU,
     OdeSolverMethod,
 };
-use numpy::PyArray2;
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
 use pyoil3::pyoil3_class;
 
 use crate::core::types;
+use crate::problem::pyoil_problem;
+use crate::solution::PyOdeSolution;
 
 /// Types specific to BDF solver
-pub type Callable = diffsol::op::bdf::BdfCallable<types::Eqn>;
-pub type DefaultBdf = Bdf::<
+pub type Callable<'a> = diffsol::op::bdf::BdfCallable<types::Eqn<'a>>;
+pub type DefaultBdf<'a> = Bdf::<
     types::M,
-    types::Eqn,
-    NewtonNonlinearSolver<Callable, NalgebraLU<types::T, Callable>>
+    types::Eqn<'a>,
+    NewtonNonlinearSolver<Callable<'a>, NalgebraLU<types::T, Callable<'a>>>
 >;
 
-/// pyoil_bdf python wrapper for DefaultBdf instance.
-type DefaultBdfRefCell = RefCell<DefaultBdf>;
+/// pyoil_bdf python wrapper for DefaultBdf instance. Static lifetime required
+/// to bypass compile time lifetime checks.
+type DefaultBdfRefCell = RefCell<DefaultBdf<'static>>;
+
 pyoil3_class!(
     "Bdf",
     DefaultBdfRefCell,
@@ -41,18 +44,14 @@ impl pyoil_bdf::PyClass {
     ///
     pub fn solve<'p>(
         slf: PyRefMut<'p, Self>,
-        problem: &crate::problem::pyoil_problem::PyClass
-    ) -> PyResult<pyo3::Bound<'p, PyArray2<f64>>> {
-        // FIXME remove unwraps
-        let solver = slf.0.lock().unwrap();
-        let problem = problem.0.lock().unwrap();
+        problem: &pyoil_problem::PyClass
+    ) -> PyResult<PyOdeSolution> {
+        let solver_guard = slf.0.lock().unwrap();
+        let mut solver = solver_guard.instance.borrow_mut();
 
-        let mut solver = solver.instance.borrow_mut();
-        let result = solver.solve(&problem.ref_static, 1.0);
-        let Ok(matrix) = result else {
-            return Err(PyValueError::new_err("Solver error".to_string())); // FIXME review error
-        };
-
-        Ok(crate::matrix::matrix_to_py(slf.py(), &matrix))
+        let problem_guard = problem.0.lock().unwrap();
+        let result = solver.solve(&problem_guard.ref_static, 1.0);
+        let solution = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+        Ok(PyOdeSolution(solution))
     }
 }

@@ -1,13 +1,16 @@
 use diffsol::DiffSlContext;
-
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
-
 use pyoil3::pyoil3_class;
+
+use crate::core::types;
+
+// Type is aliased until pyoil3 can parse generics
+pub type DiffSlContextM = DiffSlContext<types::M>;
 
 pyoil3_class!(
     "OdeSolverContext",
-    DiffSlContext,
+    DiffSlContextM,
     pyoil_context
 );
 

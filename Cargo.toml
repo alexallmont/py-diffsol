@@ -7,8 +7,9 @@ edition = "2021"
 name = "diffsol"
 
 [dependencies]
-diffsol = { version = "0.1.10", features = ["diffsl-llvm14" ] }
+diffsol = { version = "0.1.15", features = ["diffsl-llvm16" ] }
 numpy = "0.21.0"
+nalgebra = "0.33"
 pyo3 = { version = "0.21.0", features = ["extension-module"] }
 pyoil3 = { path = "./pyoil3" } # FIXME use git URI when public
 rust-numpy = "0.1.0"

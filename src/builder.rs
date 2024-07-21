@@ -5,9 +5,11 @@ use pyo3::prelude::*;
 use pyoil3::pyoil3_class;
 
 use crate::problem::pyoil_problem;
+use crate::context::pyoil_context;
 
-// 
+// pyoil type is in a refcell so builder can modify itself atomically
 type OdeBuilderRefCell = RefCell<OdeBuilder>;
+
 pyoil3_class!(
     "OdeBuilder",
     OdeBuilderRefCell,
@@ -85,14 +87,15 @@ impl pyoil_builder::PyClass {
     /// Build an OdeSolverProblem from a diffsl code string given a context
     pub fn build_diffsl<'p>(
         slf: PyRefMut<'p, Self>,
-        context: PyRef<'p, crate::context::pyoil_context::PyClass>
+        context: PyRef<'p, pyoil_context::PyClass>
     ) -> PyResult<pyoil_problem::PyClass> {
         // FIXME replace unwraps
-        let guard = slf.0.lock().unwrap();
-        let instance = &context.0.lock().unwrap().instance;
-        let builder = guard.instance.take();
-        let problem = builder.build_diffsl(&instance).unwrap();
+        let builder_guard = slf.0.lock().unwrap();
+        let context_guard = context.0.lock().unwrap();
 
+        let builder = builder_guard.instance.take();
+        let instance = &context_guard.instance;
+        let problem = builder.build_diffsl(instance).unwrap();
         let result = pyoil_problem::PyClass::bind_owned_instance(
             problem,
             context.0.clone()
