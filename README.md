@@ -2,28 +2,43 @@
 
 Python wrapper for diffsol ODE solver library
 
-## TODO
+## Usage
 
- - For review on Friday:
-   - DONE: pyoil wrapping builder, context, problem
-   - REVIEW: ideal python API?
- - TODO
-   - Use released version of PyOil3
-   - Add GitHub actions
-   - Remove pub access?
-   - Review multithreaded access. Is sync/send safe?
+This MVP implements enough to build an ODE using DiffSl and solve using BDF.
 
-## Example usage
+Until the officially released, the best way to run is to clone this repo and
+open the folder in VSCode. Follow the prompts to open in a dev container which
+will set up build dependencies from the Dockerfile and VSCode extensions for
+local development.
+
+`launch.json` has a configuration for debugging the Rust code instantiated from
+the Python example below, i.e. you can put breakpoints on any of the Rust
+currently under development.
+
+## Example
 
     $ maturin develop
     $ python
     >>> import diffsol
-    >>> builder = diffsol.OdeBuilder().rtol(1e-6).p([0.1])
-    >>> test = builder.wip_diffsl_solve("""
-    ... in = [a]
-    ... a { 1 }
-    ... u { 1.0 }
-    ... F { -a*u }
-    ... out { u }
-    ... """)
-    >>> print(test)
+    >>> context = diffsol.OdeSolverContext(
+    ... """
+    ...     in = [a]
+    ...     a { 1 }
+    ...     u { 1.0 }
+    ...     F { -a*u }
+    ...     out { u }
+    ... """
+    ... )
+    >>> builder = diffsol.OdeBuilder().rtol(1e-6).p([0.1]).h0(5.0)
+    >>> problem = builder.build_diffsl(context)
+    >>> solver = diffsol.Bdf()
+    >>> result = solver.solve(problem)
+    >>> print(result.t, result.y)
+
+## TODO
+
+- faer::Mat and matrix::sparse_faer::SparseColMat support
+  - generic impl along with nalgebra::DMatrix
+- Add GitHub actions
+- Remove pub access?
+- Review multithreaded access. Is sync/send safe?
