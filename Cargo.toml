@@ -2,14 +2,27 @@
 name = "py-diffsol"
 version = "0.1.0"
 edition = "2021"
+# license = "..." FIXME add license
+homepage = "https://github.com/alexallmont/py-diffsol"
+repository = "https://github.com/alexallmont/py-diffsol.git"
+readme = "README.md"
+rust-version = "1.75"
 
 [lib]
 name = "diffsol"
+crate-type = ["cdylib"]
 
 [dependencies]
-diffsol = { version = "0.1.15", features = ["diffsl-llvm16" ] }
-numpy = "0.21.0"
+diffsol = { version = "0.1.15", features = ["diffsl-llvm16"] }
+numpy = { version = "0.21.0", features = ["nalgebra"] }
 nalgebra = "0.33"
-pyo3 = { version = "0.21.0", features = ["extension-module"] }
+faer = "0.18.2"
+pyo3 = { version = "0.21.0" }
 pyoil3 = { git = "https://github.com/alexallmont/pyoil3.git" }
 rust-numpy = "0.1.0"
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[dev-dependencies]
+pyo3 = { version = "0.21.0", features = ["auto-initialize"] }
