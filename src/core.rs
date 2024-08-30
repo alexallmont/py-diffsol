@@ -1,5 +1,5 @@
 //! Common types required in project
-//! 
+//!
 //! Diffsol has flexible generic types that can be determined at compile time.
 //! However, python is purely runtime so some of the type information must be
 //! specified up-front. In particular the matrix storage and their underlying
