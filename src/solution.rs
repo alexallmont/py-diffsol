@@ -1,74 +1,98 @@
-use numpy::{
-    PyArray1,
-    PyArray2,
-    PyArrayMethods
-};
-use pyo3::prelude::*;
-
-use crate::core::types;
+use numpy::{PyArray1, PyArray2, PyArrayMethods, ToPyArray};
+use pyo3::{prelude::*, Bound};
+use crate::core::types::{T, V};
 
 /// Public wrappers for 1D and 2D numpy arrays
-pub type BoundPyArray1<'p> = pyo3::Bound<'p, numpy::PyArray1<types::T>>;
-pub type BoundPyArray2<'p> = pyo3::Bound<'p, numpy::PyArray2<types::T>>;
+pub type BoundPyArray1<'py> = Bound<'py, PyArray1<T>>;
+pub type BoundPyArray2<'py> = Bound<'py, PyArray2<T>>;
+
+/// Convert Vec<Vec<V>> to 2D ndarray
+///
+/// The number of columns in the output array is the minimum sized vec inside
+/// the main vec. This is a safeguard whilst diffsol uses this type to avoid
+/// any chance of a buffer overrun.
+pub fn vec_v_to_pyarray<'py>(
+    py: Python<'py>,
+    vec: &Vec<V>
+) -> BoundPyArray2<'py> {
+    let nrows = vec.len();
+    let ncols = vec.iter().map(|v| v.len()).min().unwrap_or(0);
+    let arr = unsafe {
+        PyArray2::<T>::new_bound(
+            py,
+            [nrows, ncols],
+            false
+        )
+    };
+
+    for r in 0..nrows {
+        for c in 0..ncols {
+            unsafe {
+                let elem = vec.get_unchecked(r);
+                let sub_elem = elem.get_unchecked(c);
+                arr.uget_raw([r, c]).write(*sub_elem);
+            }
+        }
+    }
+
+    arr
+}
 
 /// PyO3 wrapper for a diffsol OdeSolution
+// TODO docs import
 #[pyclass]
 #[pyo3(name = "OdeSolution")]
-pub struct PyOdeSolution(pub diffsol::OdeSolution<types::V>);
+pub struct PyOdeSolution(pub diffsol::OdeSolution<V>);
 
 #[pymethods]
 impl PyOdeSolution {
-    /// Get times as a 1D ndarray
+    /// Get times as 1D ndarray
     #[getter]
-    pub fn t<'p>(&self, py: Python<'p>) -> BoundPyArray1<'p> {
-        let len = self.0.t.len();
-        let arr = unsafe {
-            PyArray1::<types::T>::new_bound(
-                py, [len], false
-            )
-        };
-        unsafe {
-            // FIXME set direct from ptr
-            for i in 0..len {
-                let elem = self.0.t.get_unchecked(i);
-                arr.uget_raw([i]).write(*elem);
-            }
-        }
-        arr
+    pub fn t<'py>(&self, py: Python<'py>) -> BoundPyArray1<'py> {
+        let pyarray = self.0.t.to_pyarray_bound(py);
+        pyarray
     }
 
-    /// Get ys as a 2D ndarray
+    /// Get ys as 2D ndarray
     #[getter]
-    pub fn y<'p>(&self, py: Python<'p>) -> BoundPyArray2<'p> {
-        match self.0.y.len() {
-            0 => {
-                let arr = unsafe {
-                    PyArray2::<types::T>::new_bound(
-                        py, [0, 0], false
-                    )
-                };
-                arr
-            },
-            len => {
-                // FIXME safe to assume all elements equal?
-                let ys_len = self.0.y.get(0).unwrap().len();
-                let arr = unsafe {
-                    PyArray2::<types::T>::new_bound(
-                        py, [len, ys_len], false
-                    )
-                };
-                // FIXME set direct from ptr
-                for i in 0..len {
-                    for j in 0..ys_len {
-                        unsafe {
-                            let elem = self.0.y.get_unchecked(i);
-                            let sub_elem = elem.get_unchecked(j);
-                            arr.uget_raw([i, j]).write(*sub_elem);
-                        }
-                    }
-                }
-                arr
+    pub fn y<'py>(&self, py: Python<'py>) -> BoundPyArray2<'py> {
+        vec_v_to_pyarray(py, &self.0.y)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use numpy::ndarray::{arr2, Array2};
+    use super::*;
+
+    #[test]
+    fn test_vec_v_to_pyarray() {
+        pyo3::Python::with_gil(|py| {
+            let mut rows = Vec::<V>::new();
+
+            // Initially test empty case
+            {
+                let pyarray = vec_v_to_pyarray(py, &rows);
+                assert_eq!(pyarray.len().unwrap(), 0);
+                assert_eq!(pyarray.readonly().as_array(), Array2::zeros([0, 0]));
             }
-        }
+
+            // Check that a 3x1 addition ends up as a 1 new row of 3 columns.
+            {
+                rows.push(nalgebra::MatrixXx1::from_vec(vec!(1.0, 2.0, 3.0)));
+                let pyarray = vec_v_to_pyarray(py, &rows);
+                assert_eq!(pyarray.len().unwrap(), 1);
+                assert_eq!(pyarray.readonly().as_array(), arr2(&[[1.0, 2.0, 3.0]]));
+            }
+
+            // Edge case of adding 2x1 afterwards results in 2 rows of 2 columns
+            // because the conversion avoids overrunning the minimum col length.
+            {
+                rows.push(nalgebra::MatrixXx1::from_vec(vec!(4.0, 5.0)));
+                let pyarray = vec_v_to_pyarray(py, &rows);
+                assert_eq!(pyarray.len().unwrap(), 2);
+                assert_eq!(pyarray.readonly().as_array(), arr2(&[[1.0, 2.0], [4.0, 5.0]]));
+            }
+        });
     }
 }
