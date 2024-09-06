@@ -1,3 +1,5 @@
+// FIXME rename this file. Solution type is no longer in diffsol
+
 use numpy::{PyArray1, PyArray2, PyArrayMethods, ToPyArray};
 use pyo3::{prelude::*, Bound};
 use crate::core::types::{T, V};
@@ -38,26 +40,12 @@ pub fn vec_v_to_pyarray<'py>(
     arr
 }
 
-/// PyO3 wrapper for a diffsol OdeSolution
-// TODO docs import
-#[pyclass]
-#[pyo3(name = "OdeSolution")]
-pub struct PyOdeSolution(pub diffsol::OdeSolution<V>);
-
-#[pymethods]
-impl PyOdeSolution {
-    /// Get times as 1D ndarray
-    #[getter]
-    pub fn t<'py>(&self, py: Python<'py>) -> BoundPyArray1<'py> {
-        let pyarray = self.0.t.to_pyarray_bound(py);
-        pyarray
-    }
-
-    /// Get ys as 2D ndarray
-    #[getter]
-    pub fn y<'py>(&self, py: Python<'py>) -> BoundPyArray2<'py> {
-        vec_v_to_pyarray(py, &self.0.y)
-    }
+pub fn vec_t_to_pyarray<'py>(
+    py: Python<'py>,
+    vec: &Vec<T>
+) -> BoundPyArray1<'py> {
+    let pyarray = vec.to_pyarray_bound(py);
+    pyarray
 }
 
 #[cfg(test)]

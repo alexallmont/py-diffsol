@@ -12,7 +12,7 @@ use pyoil3::pyoil3_class;
 
 use crate::core::types;
 use crate::problem::pyoil_problem;
-use crate::solution::{BoundPyArray2, PyOdeSolution, vec_v_to_pyarray};
+use crate::solution::{BoundPyArray1, BoundPyArray2, vec_v_to_pyarray, vec_t_to_pyarray};
 use crate::stop_reason::PyOdeSolverStopReason;
 
 /// Types specific to BDF solver
@@ -46,8 +46,8 @@ impl pyoil_bdf::PyClass {
     // TODO fn set_problem(&mut self, state: OdeSolverState<Eqn::V>, problem: &OdeSolverProblem<Eqn>);
 
     /// TODO docs import
-    pub fn step<'p>(
-        slf: PyRefMut<'p, Self>
+    pub fn step<'py>(
+        slf: PyRefMut<'py, Self>
     ) -> PyResult<PyOdeSolverStopReason> {
         let solver_guard = slf.0.lock().unwrap();
         let mut solver = solver_guard.instance.borrow_mut();
@@ -63,19 +63,22 @@ impl pyoil_bdf::PyClass {
     // TODO fn order(&self) -> usize;
 
     /// TODO docs import
-    pub fn solve<'p>(
-        slf: PyRefMut<'p, Self>,
+    pub fn solve<'py>(
+        slf: PyRefMut<'py, Self>,
         problem: &pyoil_problem::PyClass,
         final_time: Option<types::T>
-    ) -> PyResult<PyOdeSolution> {
+    ) -> PyResult<(BoundPyArray2<'py>, BoundPyArray1<'py>)> {
         let solver_guard = slf.0.lock().unwrap();
         let mut solver = solver_guard.instance.borrow_mut();
 
         let problem_guard = problem.0.lock().unwrap();
         let final_time = final_time.unwrap_or(1.0);
         let result = solver.solve(&problem_guard.ref_static, final_time);
-        let solution = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-        Ok(PyOdeSolution(solution))
+        let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+        Ok((
+            vec_v_to_pyarray(slf.py(), &y),
+            vec_t_to_pyarray(slf.py(), &t   ),
+        ))
     }
 
     /// TODO docs import
