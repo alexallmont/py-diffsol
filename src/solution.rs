@@ -67,7 +67,7 @@ mod tests {
 
             // Check that a 3x1 addition ends up as a 1 new row of 3 columns.
             {
-                rows.push(nalgebra::MatrixXx1::from_vec(vec!(1.0, 2.0, 3.0)));
+                rows.push(V::from_vec(vec!(1.0, 2.0, 3.0)));
                 let pyarray = vec_v_to_pyarray(py, &rows);
                 assert_eq!(pyarray.len().unwrap(), 1);
                 assert_eq!(pyarray.readonly().as_array(), arr2(&[[1.0, 2.0, 3.0]]));
@@ -76,7 +76,7 @@ mod tests {
             // Edge case of adding 2x1 afterwards results in 2 rows of 2 columns
             // because the conversion avoids overrunning the minimum col length.
             {
-                rows.push(nalgebra::MatrixXx1::from_vec(vec!(4.0, 5.0)));
+                rows.push(V::from_vec(vec!(4.0, 5.0)));
                 let pyarray = vec_v_to_pyarray(py, &rows);
                 assert_eq!(pyarray.len().unwrap(), 2);
                 assert_eq!(pyarray.readonly().as_array(), arr2(&[[1.0, 2.0], [4.0, 5.0]]));

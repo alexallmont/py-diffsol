@@ -2,9 +2,10 @@ use std::cell::RefCell;
 
 use diffsol::{
     Bdf,
-    NalgebraLU,
     NewtonNonlinearSolver,
-    OdeSolverMethod
+    OdeSolverMethod,
+    DefaultSolver,
+    DefaultDenseMatrix
 };
 use pyo3::prelude::*;
 use pyo3::exceptions::PyValueError;
@@ -18,9 +19,9 @@ use crate::stop_reason::PyOdeSolverStopReason;
 /// Types specific to BDF solver
 pub type Callable<'a> = diffsol::op::bdf::BdfCallable<types::Eqn<'a>>;
 pub type DefaultBdf<'a> = Bdf::<
-    types::M,
+    <types::V as DefaultDenseMatrix>::M,
     types::Eqn<'a>,
-    NewtonNonlinearSolver<Callable<'a>, NalgebraLU<types::T, Callable<'a>>>
+    NewtonNonlinearSolver<Callable<'a>, <types::M as DefaultSolver>::LS::<Callable<'a>>>
 >;
 
 /// pyoil_bdf python wrapper for DefaultBdf instance. Static lifetime required
@@ -77,7 +78,7 @@ impl pyoil_bdf::PyClass {
         let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
         Ok((
             vec_v_to_pyarray(slf.py(), &y),
-            vec_t_to_pyarray(slf.py(), &t   ),
+            vec_t_to_pyarray(slf.py(), &t),
         ))
     }
 

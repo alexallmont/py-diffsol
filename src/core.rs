@@ -5,15 +5,19 @@
 //! specified up-front. In particular the matrix storage and their underlying
 //! element type of f64.
 
-pub mod types {
-    use diffsol::ode_solver::diffsl;
-
-    /// Underlying value and matrix types.
-    // FIXME add faer::Mat and matrix::sparse_faer::SparseColMat
+pub mod nalgebra_dense {
     pub type T = f64;
     pub type M = nalgebra::DMatrix<T>;
     pub type V = <M as diffsol::matrix::MatrixCommon>::V;
-
-    /// Eqn is required for solvers (with static lifetime for pyoil3).
-    pub type Eqn<'a> = diffsl::DiffSl<'a, M>;
+    pub type Eqn<'a> = diffsol::ode_solver::diffsl::DiffSl<'a, M>;
 }
+
+pub mod faer_sparse {
+    pub type T = f64;
+    pub type M = diffsol::SparseColMat<T>;
+    pub type V = <M as diffsol::matrix::MatrixCommon>::V;
+    pub type Eqn<'a> = diffsol::ode_solver::diffsl::DiffSl<'a, M>;
+}
+
+// FIXME testing faer but these types need to be runtime-swappable
+pub use nalgebra_dense as types;

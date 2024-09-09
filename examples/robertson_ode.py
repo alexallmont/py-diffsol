@@ -11,7 +11,7 @@ context = diffsol.OdeSolverContext(
     in = [a, b, c]
     a { 1 } b { 1 } c { 1 }
     u_i { y1 = 1.0, y2 = 0.0, y3 = 0.0 }
-    F_i { 
+    F_i {
         -a*y1 + b*y2*y3,
         a*y1 - b*y2*y3 - c*y2*y2,
         c*y2*y2
@@ -24,7 +24,8 @@ builder = diffsol.OdeBuilder().rtol(1e-4).atol([1.e-8, 1.e-14, 1.e-6]).p([0.04, 
 problem = builder.build_diffsl(context)
 solver = diffsol.Bdf()
 t_eval = [0.0, 0.4, 4.0, 40.0, 400.0, 4000.0, 40000.0, 400000.0, 4000000.0, 2.0790e7, 4.0e7, 4.0e8, 4.0e9, 4.0e10]
-result = solver.solve_dense(problem, t_eval)
+ys = solver.solve_dense(problem, t_eval)
+
 # these tolerances might not be correct since I didn't write out the expected values
 # to this accuracy
 rtol = 1e-4
@@ -45,5 +46,6 @@ expected = [
     np.array([5.258603e-07, 2.103442e-12, 0.9999995]),
     np.array([6.934511e-08, 2.773804e-13, 0.9999999])
 ]
-for t, y, expect in zip(result.t, result.y, expected):
+
+for y in ys:
     np.testing.assert_allclose(y, expect, rtol=rtol, atol=atol) 
