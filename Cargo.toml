@@ -6,23 +6,26 @@ edition = "2021"
 homepage = "https://github.com/alexallmont/py-diffsol"
 repository = "https://github.com/alexallmont/py-diffsol.git"
 readme = "README.md"
-rust-version = "1.75"
 
 [lib]
 name = "diffsol"
 crate-type = ["cdylib"]
 
 [dependencies]
+pyo3 = { version = "0.21.2", default-features = false }
 diffsol = { version = "0.2.1", features = ["diffsl-llvm16"] }
 numpy = { version = "0.21.0", features = ["nalgebra"] }
 nalgebra = "0.33"
 faer = "0.18.2"
-pyo3 = { version = "0.21.0" }
 pyoil3 = { git = "https://github.com/alexallmont/pyoil3.git" }
 rust-numpy = "0.1.0"
+
+[dev-dependencies]
+pyo3 = { version = "*", default-features = false, features = ["auto-initialize"] }
+
+[build-dependencies]
+pyo3-build-config = { version = "*", features = ["resolve-config"] }
 
 [features]
 extension-module = ["pyo3/extension-module"]
 
-[dev-dependencies]
-pyo3 = { version = "0.21.0", features = ["auto-initialize"] }
