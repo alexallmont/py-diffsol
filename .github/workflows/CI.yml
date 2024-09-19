@@ -164,10 +164,11 @@ jobs:
       - name: Install LLVM and Clang (macOS)
         run: |
           brew install llvm@16
-          echo "LLVM_SYS_160_PREFIX=/opt/homebrew/opt/llvm@16" >> $GITHUB_ENV
-          echo "LLVM_DIR=/opt/homebrew/opt/llvm@16" >> $GITHUB_ENV
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          LLVM_SYS_160_PREFIX: /usr/local/opt/llvm@16
+          LLVM_DIR: /usr/local/opt/llvm@16
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
