@@ -164,6 +164,7 @@ jobs:
       - name: Install LLVM and Clang (macOS)
         run: |
           brew install llvm@16
+          find /opt/homebrew -name LLVMConfig.cmake
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
