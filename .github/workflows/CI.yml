@@ -43,6 +43,7 @@ jobs:
       - name: Find LLVM
         run: |
           find /usr -name LLVMConfig.cmake || true
+          find /home/runner/work/py-diffsol -name LLVMConfig.cmake || true
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
