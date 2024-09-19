@@ -164,7 +164,6 @@ jobs:
       - name: Install LLVM and Clang (macOS)
         run: |
           brew install llvm@16
-        env:
           echo "LLVM_SYS_160_PREFIX=/usr/local/opt/llvm@16" >> $GITHUB_ENV
           echo "LLVM_DIR=/usr/local/opt/llvm@16" >> $GITHUB_ENV
       - name: Build wheels
