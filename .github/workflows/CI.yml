@@ -164,7 +164,7 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
-          LLVM_DIR: $LLVM_PATH/lib/cmake/llvm
+          LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
