@@ -165,7 +165,6 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
-          LLVM_SYS_160_PREFIX: /usr/local/opt/llvm@16
           LLVM_DIR: /opt/homebrew/Cellar/llvm@16/16.0.6_1/lib/cmake/llvm
         with:
           target: ${{ matrix.platform.target }}
