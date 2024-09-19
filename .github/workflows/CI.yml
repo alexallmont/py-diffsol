@@ -43,6 +43,7 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
+          LLVM_SYS_160_PREFIX: ${{ env.LLVM_PATH }}
           LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
         with:
           target: ${{ matrix.platform.target }}
@@ -105,6 +106,7 @@ jobs:
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
+          LLVM_SYS_160_PREFIX: ${{ env.LLVM_PATH }}
           LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
         with:
           target: ${{ matrix.platform.target }}
