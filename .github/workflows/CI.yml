@@ -36,14 +36,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - name: Install LLVM and Clang into LLVM_PATH (Ubuntu)
+      - name: Install LLVM and Clang into LLVM_PATH (linux)
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: "16.0"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
-          LLVM_DIR: $LLVM_PATH/lib/cmake/llvm
+          LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
@@ -98,12 +98,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - name: Install LLVM and Clang (Ubuntu)
+      - name: Install LLVM and Clang into LLVM_PATH (musllinux)
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: "16.0"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
