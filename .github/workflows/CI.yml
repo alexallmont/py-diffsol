@@ -164,8 +164,9 @@ jobs:
       - name: Install LLVM and Clang (macOS)
         run: |
           brew install llvm@14
-          echo "LLVM_SYS_140_PREFIX=/usr/local/opt/llvm@14" >> $GITHUB_ENV
-          echo "LLVM_DIR=/usr/local/opt/llvm@14" >> $GITHUB_ENV
+        env:
+          LLVM_SYS_140_PREFIX: /usr/local/opt/llvm@14
+          LLVM_DIR: /usr/local/opt/llvm@14
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
