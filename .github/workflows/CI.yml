@@ -31,10 +31,6 @@ jobs:
             target: aarch64
           - runner: ubuntu-latest
             target: armv7
-          - runner: ubuntu-latest
-            target: s390x
-          - runner: ubuntu-latest
-            target: ppc64le
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -152,8 +148,6 @@ jobs:
     strategy:
       matrix:
         platform:
-          - runner: macos-12
-            target: x86_64
           - runner: macos-14
             target: aarch64
     steps:
