@@ -44,7 +44,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         env:
           LLVM_SYS_160_PREFIX: ${{ env.LLVM_PATH }}
-          LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
+          LLVM_DIR: ${{ env.LLVM_PATH }}
         with:
           target: ${{ matrix.platform.target }}
           args: --release --out dist --find-interpreter
