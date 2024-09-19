@@ -165,8 +165,8 @@ jobs:
         run: |
           brew install llvm@16
         env:
-          LLVM_SYS_160_PREFIX: /usr/local/opt/llvm@16
-          LLVM_DIR: /usr/local/opt/llvm@16
+          echo "LLVM_SYS_160_PREFIX=/usr/local/opt/llvm@16" >> $GITHUB_ENV
+          echo "LLVM_DIR=/usr/local/opt/llvm@16" >> $GITHUB_ENV
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
