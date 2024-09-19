@@ -43,7 +43,7 @@ jobs:
       - name: Install LLVM and Clang (Ubuntu)
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "14.0"
+          version: "16.0"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -103,7 +103,7 @@ jobs:
       - name: Install LLVM and Clang (Ubuntu)
         uses: KyleMayes/install-llvm-action@v2
         with:
-          version: "14.0"
+          version: "16.0"
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -163,10 +163,10 @@ jobs:
           python-version: 3.x
       - name: Install LLVM and Clang (macOS)
         run: |
-          brew install llvm@14
+          brew install llvm@16
         env:
-          LLVM_SYS_140_PREFIX: /usr/local/opt/llvm@14
-          LLVM_DIR: /usr/local/opt/llvm@14
+          LLVM_SYS_160_PREFIX: /usr/local/opt/llvm@16
+          LLVM_DIR: /usr/local/opt/llvm@16
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
