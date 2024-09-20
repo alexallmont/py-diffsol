@@ -48,6 +48,7 @@ jobs:
         env:
           CMAKE_PREFIX_PATH: ${{ env.LLVM_PATH }}/lib/cmake/llvm
           LLVM_SYS_160_PREFIX: ${{ env.LLVM_PATH }}
+          LLVM_CONFIG_PATH: ${{ env.LLVM_PATH }}/bin/llvm-config
           LLVM_DIR: ${{ env.LLVM_PATH }}/lib/cmake/llvm
         with:
           target: ${{ matrix.platform.target }}
