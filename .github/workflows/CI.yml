@@ -39,6 +39,10 @@ jobs:
       - uses: KyleMayes/install-llvm-action@v2
         with:
           version: "16.0"
+      - name: Check llvm-config version
+        shell: bash
+        run: |
+          ${{ env.LLVM_PATH }}/bin/llvm-config --version
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         env:
