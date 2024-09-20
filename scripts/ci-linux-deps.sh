@@ -1,5 +1,5 @@
 #!/bin/bash
 
-yum install llvm-devel
+yum install -y llvm-devel
 llvm-config --version
 llvm-config --prefix
