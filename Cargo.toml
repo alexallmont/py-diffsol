@@ -13,7 +13,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.21.2", default-features = false }
-diffsol = { version = "0.2.1", features = ["diffsl-llvm16"] }
+diffsol = { version = "0.2.1", features = ["diffsl-llvm14"] }
 numpy = { version = "0.21.0", features = ["nalgebra"] }
 nalgebra = "0.33"
 faer = "0.18.2"

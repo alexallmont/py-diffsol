@@ -37,12 +37,12 @@ currently under development.
 
 ## Building and testing outside devcontainer
 
-To build against a specific LLVM version, set the `LLVM_SYS_160_PREFIX` and `LLVM_DIR` environment variables.
+To build against a specific LLVM version, set the `LLVM_SYS_140_PREFIX` and `LLVM_DIR` environment variables.
 
 To run `cargo test`, set `PYTHONPATH` to the location of your venv site packages to distinguish from the system environment.
 
 For example, a native macOS build with a local `venv` could be configured with a `.cargo/config.toml` file containing:
 
-    LLVM_SYS_160_PREFIX = "/opt/homebrew/opt/llvm@16"
-    LLVM_DIR = "/opt/homebrew/opt/llvm@16"
+    LLVM_SYS_140_PREFIX = "/opt/homebrew/opt/llvm@14"
+    LLVM_DIR = "/opt/homebrew/opt/llvm@14"
     PYTHONPATH = "venv/lib/python3.12/site-packages"

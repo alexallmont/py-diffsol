@@ -3,9 +3,9 @@ FROM rust:1.79-bookworm
 RUN apt-get update
 RUN apt install -y --no-install-recommends \
     cmake \
-    llvm-16-dev \
-    libpolly-16-dev \
-    libclang-16-dev \
+    llvm-14-dev \
+    libpolly-14-dev \
+    libclang-14-dev \
     python3.11-venv \
     python3.11-dev \
     && \
