@@ -40,10 +40,10 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          before-script-linux: scripts/ci-linux-deps.sh
           args: --release --out dist --find-interpreter
           sccache: 'true'
-          manylinux: auto
+          manylinux: manylinux_2_28
+          before-script-linux: scripts/ci-linux-deps.sh
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
