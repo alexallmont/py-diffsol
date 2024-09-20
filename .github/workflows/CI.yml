@@ -36,16 +36,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: 3.x
-      - name: Check llvm-config version
-        shell: bash
-        run: |
-          which llvm-config
-          llvm-config --version
-          llvm-config --prefix
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
+          before-script-linux: scripts/ci-linux-deps.sh
           args: --release --out dist --find-interpreter
           sccache: 'true'
           manylinux: auto
