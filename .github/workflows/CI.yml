@@ -44,8 +44,10 @@ jobs:
           sccache: 'true'
           manylinux: manylinux2014
           before-script-linux: |
-            export PATH=/opt/python/cp311-cp311/bin/:$PATH
-            yum install -y llvm-devel
+            yum install -y llvm14-devel
+            export PATH=/opt/python/cp311-cp311/bin/:/usr/lib64/llvm14/bin:$PATH
+            export LLVM_SYS_140_PREFIX=$(llvm-config --prefix)
+            export LLVM_DIR=$(llvm-config --prefix)/lib/cmake/llvm
             llvm-config --version
             llvm-config --prefix
             python --version
