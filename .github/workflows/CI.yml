@@ -44,6 +44,7 @@ jobs:
           sccache: 'true'
           manylinux: manylinux_2_28
           before-script-linux: |
+            export PATH=/opt/python/cp311-cp311/bin/:$PATH
             yum install -y llvm-devel
             llvm-config --version
             llvm-config --prefix
