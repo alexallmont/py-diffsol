@@ -1,20 +1,25 @@
-use::pyo3::prelude::*;
+use pyo3::prelude::*;
 
-mod core;
+#[path = "."]
+mod nalgebra_dense_f64 {
+    static MODULE_NAME:&'static str = "nalgebra_dense_f64";
+    type M = nalgebra::DMatrix<f64>;
+    mod bindings;
+    pub use bindings::*;
+}
 
-mod bdf;
-mod builder;
-mod context;
-mod problem;
-mod solution; // FIXME rename file
-mod stop_reason;
+#[path = "."]
+mod faer_sparse_f64 {
+    static MODULE_NAME:&'static str = "faer_sparse_f64";
+    type M = diffsol::SparseColMat<f64>;
+    mod bindings;
+    pub use bindings::*;
+}
 
+/// Top-level typed diffsol bindings
 #[pymodule]
-fn diffsol<'py>(m: &Bound<'py, PyModule>) -> PyResult<()> {
-    m.add_class::<bdf::pyoil_bdf::PyClass>()?;
-    m.add_class::<builder::pyoil_builder::PyClass>()?;
-    m.add_class::<context::pyoil_context::PyClass>()?;
-    m.add_class::<problem::pyoil_problem::PyClass>()?;
-    m.add_class::<stop_reason::PyOdeSolverStopReason>()?;
+fn diffsol(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    nalgebra_dense_f64::add_to_parent_module(m)?;
+    faer_sparse_f64::add_to_parent_module(m)?;
     Ok(())
 }
