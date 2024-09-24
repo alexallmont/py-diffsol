@@ -13,7 +13,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = { version = "0.21.2", default-features = false }
-diffsol = { version = "0.2.1", features = ["diffsl-llvm16"] }
+diffsol = { version = "0.2.1", features = ["diffsl-llvm16", "suitesparse"] }
 numpy = { version = "0.21.0", features = ["nalgebra"] }
 nalgebra = "0.33"
 faer = "0.18.2"
@@ -28,4 +28,9 @@ pyo3-build-config = { version = "*", features = ["resolve-config"] }
 
 [features]
 extension-module = ["pyo3/extension-module"]
-
+default = ["nalgebra_dense_lu_f64", "faer_sparse_lu_f64", "bdf"]
+nalgebra_dense_lu_f64 = []
+faer_sparse_lu_f64 = []
+faer_sparse_klu_f64 = []
+bdf = []
+sdirk = []

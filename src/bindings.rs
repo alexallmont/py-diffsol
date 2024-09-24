@@ -1,4 +1,4 @@
-use super::{MODULE_NAME, M};
+use super::{MODULE_NAME, Matrix, LinearSolver};
 
 use std::cell::RefCell;
 use pyo3::{
@@ -20,38 +20,17 @@ use crate::convert::{
     vec_t_to_pyarray,
 };
 
+type M = Matrix;
+type LS<Op> = LinearSolver<Op>;
 type V = <M as diffsol::matrix::MatrixCommon>::V;
 type T = <M as diffsol::matrix::MatrixCommon>::T;
+type DM = <V as diffsol::DefaultDenseMatrix>::M;
 type Eqn<'a> = diffsol::ode_solver::diffsl::DiffSl<'a, M>;
 
 // Aliases for diffsol classes, by type where necessary
 type Context = diffsol::DiffSlContext<M>;
 type Problem<'a> = diffsol::OdeSolverProblem<Eqn<'a>>;
 type Builder = diffsol::OdeBuilder;
-
-/// BDF types, static lifetime required to bypass compile time lifetime checks
-type BdfCallable<'a> = diffsol::op::bdf::BdfCallable<Eqn<'a>>;
-type Bdf<'a> = diffsol::Bdf::<
-    M,
-    Eqn<'a>,
-    diffsol::NewtonNonlinearSolver<
-        BdfCallable<'a>,
-        <M as diffsol::DefaultSolver>::LS::<BdfCallable<'a>>
-    >
->;
-
-/* // FIXME review types
-type SdirkCallable<'a> = diffsol::op::sdirk::SdirkCallable<Eqn<'a>>;
-type Sdirk<'a> = diffsol::Sdirk::<
-    M,
-    diffsol::linear_solver::FaerLU<SdirkCallable<'a>>,
-    Eqn<'a>
->; */
-
-// Wrapped ref cells for diffsol classes that require mutation
-type BuilderRefCell = RefCell<diffsol::OdeBuilder>;
-type ProblemRefCell = RefCell<diffsol::OdeSolverProblem<M>>;
-type BdfRefCell = RefCell<Bdf<'static>>;
 
 
 // -----------------------------------------------------------------------------
@@ -74,12 +53,16 @@ impl pyoil_context::PyClass {
 // -----------------------------------------------------------------------------
 // Problem class
 // -----------------------------------------------------------------------------
+type ProblemRefCell = RefCell<diffsol::OdeSolverProblem<M>>;
+
 pyoil3_ref_class!("Problem", Problem, pyoil_problem, pyoil_context);
 
 
 // -----------------------------------------------------------------------------
 // Builder class
 // -----------------------------------------------------------------------------
+type BuilderRefCell = RefCell<diffsol::OdeBuilder>;
+
 pyoil3_class!("Builder", BuilderRefCell, pyoil_builder);
 
 // Helper for fluent builder interface to apply `tx` function to underlying
@@ -184,57 +167,146 @@ impl From<SolverStopReasonT> for SolverStopReason {
 // -----------------------------------------------------------------------------
 // Bdf solver class
 // -----------------------------------------------------------------------------
-pyoil3_class!("Bdf", BdfRefCell, pyoil_bdf);
+#[cfg(feature = "bdf")]
+mod bdf {
+    use super::*;
 
-#[pymethods]
-impl pyoil_bdf::PyClass {
-    #[new]
-    pub fn new() -> pyoil_bdf::PyClass {
-        pyoil_bdf::PyClass::bind_instance(
-            RefCell::new(Bdf::default())
-        )
+    type BdfCallable<'a> = diffsol::op::bdf::BdfCallable<Eqn<'a>>;
+    type BdfNonLinearSolver<'a> = diffsol::NewtonNonlinearSolver<
+        BdfCallable<'a>,
+        LS<BdfCallable<'a>>
+    >;
+    type Bdf<'a> = diffsol::Bdf::<
+        DM,
+        Eqn<'a>,
+        BdfNonLinearSolver<'a>
+    >;
+    type BdfRefCell = RefCell<Bdf<'static>>;
+
+    pyoil3_class!("Bdf", BdfRefCell, pyoil_bdf);
+
+    #[pymethods]
+    impl pyoil_bdf::PyClass {
+        #[new]
+        pub fn new() -> pyoil_bdf::PyClass {
+            pyoil_bdf::PyClass::bind_instance(
+                RefCell::new(Bdf::default())
+            )
+        }
+
+        pub fn step<'py>(
+            slf: PyRefMut<'py, Self>
+        ) -> PyResult<SolverStopReason> {
+            let solver_guard = slf.0.lock().unwrap();
+            let mut solver = solver_guard.instance.borrow_mut();
+            let result = solver.step();
+            let state = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+            Ok(SolverStopReason::from(state))
+        }
+
+        pub fn solve<'py>(
+            slf: PyRefMut<'py, Self>,
+            problem: &pyoil_problem::PyClass,
+            final_time: Option<T>
+        ) -> PyResult<(Bound<'py, PyArray2<f64>>, Bound<'py, PyArray1<f64>>)> {
+            let solver_guard = slf.0.lock().unwrap();
+            let mut solver = solver_guard.instance.borrow_mut();
+
+            let problem_guard = problem.0.lock().unwrap();
+            let final_time = final_time.unwrap_or(1.0);
+            let result = solver.solve(&problem_guard.ref_static, final_time);
+            let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+            Ok((
+                vec_v_to_pyarray::<DM>(slf.py(), &y), // FIXME make into type
+                vec_t_to_pyarray(slf.py(), &t),
+            ))
+        }
+
+        fn solve_dense<'py>(
+            slf: PyRefMut<'py, Self>,
+            problem: &pyoil_problem::PyClass,
+            t_eval: Vec<T>
+        ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+            let solver_guard = slf.0.lock().unwrap();
+            let mut solver = solver_guard.instance.borrow_mut();
+            let problem_guard = problem.0.lock().unwrap();
+            let result = solver.solve_dense(&problem_guard.ref_static, &t_eval);
+            let values = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+            let pyarray = vec_v_to_pyarray::<DM>(slf.py(), &values);
+            Ok(pyarray)
+        }
     }
+}
 
-    pub fn step<'py>(
-        slf: PyRefMut<'py, Self>
-    ) -> PyResult<SolverStopReason> {
-        let solver_guard = slf.0.lock().unwrap();
-        let mut solver = solver_guard.instance.borrow_mut();
-        let result = solver.step();
-        let state = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-        Ok(SolverStopReason::from(state))
-    }
+// -----------------------------------------------------------------------------
+// SDIRK solver class
+// -----------------------------------------------------------------------------
+#[cfg(feature = "sdirk")]
+mod sdirk {
+    // FIXME refactor to remove duplicate BDF code
+    use super::*;
 
-    pub fn solve<'py>(
-        slf: PyRefMut<'py, Self>,
-        problem: &pyoil_problem::PyClass,
-        final_time: Option<T>
-    ) -> PyResult<(Bound<'py, PyArray2<f64>>, Bound<'py, PyArray1<f64>>)> {
-        let solver_guard = slf.0.lock().unwrap();
-        let mut solver = solver_guard.instance.borrow_mut();
+    type SdirkCallable<'a> = diffsol::op::sdirk::SdirkCallable<Eqn<'a>>;
+    type Sdirk<'a> = diffsol::Sdirk::<
+        DM,
+        LS::<SdirkCallable<'a>>,
+        Eqn<'a>
+    >;
+    type SdirkRefCell = RefCell<Sdirk<'static>>;
 
-        let problem_guard = problem.0.lock().unwrap();
-        let final_time = final_time.unwrap_or(1.0);
-        let result = solver.solve(&problem_guard.ref_static, final_time);
-        let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-        Ok((
-            vec_v_to_pyarray::<M>(slf.py(), &y),
-            vec_t_to_pyarray(slf.py(), &t),
-        ))
-    }
+    pyoil3_class!("Sdirk", SdirkRefCell, pyoil_sdirk);
 
-    fn solve_dense<'py>(
-        slf: PyRefMut<'py, Self>,
-        problem: &pyoil_problem::PyClass,
-        t_eval: Vec<T>
-    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-        let solver_guard = slf.0.lock().unwrap();
-        let mut solver = solver_guard.instance.borrow_mut();
-        let problem_guard = problem.0.lock().unwrap();
-        let result = solver.solve_dense(&problem_guard.ref_static, &t_eval);
-        let values = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-        let pyarray = vec_v_to_pyarray::<M>(slf.py(), &values);
-        Ok(pyarray)
+    #[pymethods]
+    impl pyoil_sdirk::PyClass {
+        #[new]
+        pub fn new() -> pyoil_sdirk::PyClass {
+            let tableau = diffsol::Tableau::<DM>::tr_bdf2();
+            pyoil_sdirk::PyClass::bind_instance(
+            RefCell::new(diffsol::Sdirk::new(tableau, LinearSolver::default()))
+            )
+        }
+
+        pub fn step<'py>(
+            slf: PyRefMut<'py, Self>
+        ) -> PyResult<SolverStopReason> {
+            let solver_guard = slf.0.lock().unwrap();
+            let mut solver = solver_guard.instance.borrow_mut();
+            let result = solver.step();
+            let state = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+            Ok(SolverStopReason::from(state))
+        }
+
+        pub fn solve<'py>(
+            slf: PyRefMut<'py, Self>,
+            problem: &pyoil_problem::PyClass,
+            final_time: Option<T>
+        ) -> PyResult<(Bound<'py, PyArray2<f64>>, Bound<'py, PyArray1<f64>>)> {
+            let solver_guard = slf.0.lock().unwrap();
+            let mut solver = solver_guard.instance.borrow_mut();
+
+            let problem_guard = problem.0.lock().unwrap();
+            let final_time = final_time.unwrap_or(1.0);
+            let result = solver.solve(&problem_guard.ref_static, final_time);
+            let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+            Ok((
+                vec_v_to_pyarray::<M>(slf.py(), &y),
+                vec_t_to_pyarray(slf.py(), &t),
+            ))
+        }
+
+        fn solve_dense<'py>(
+            slf: PyRefMut<'py, Self>,
+            problem: &pyoil_problem::PyClass,
+            t_eval: Vec<T>
+        ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+            let solver_guard = slf.0.lock().unwrap();
+            let mut solver = solver_guard.instance.borrow_mut();
+            let problem_guard = problem.0.lock().unwrap();
+            let result = solver.solve_dense(&problem_guard.ref_static, &t_eval);
+            let values = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+            let pyarray = vec_v_to_pyarray::<M>(slf.py(), &values);
+            Ok(pyarray)
+        }
     }
 }
 
@@ -246,12 +318,18 @@ pub fn add_to_parent_module(
     parent_module: &Bound<'_, PyModule>
 ) -> PyResult<()> {
     let m = PyModule::new_bound(parent_module.py(), &MODULE_NAME)?;
+
     m.add_class::<pyoil_context::PyClass>()?;
     m.add_class::<pyoil_problem::PyClass>()?;
     m.add_class::<pyoil_builder::PyClass>()?;
-    m.add_class::<pyoil_bdf::PyClass>()?;
 
-    // Module docstring has to be programatic because #[pymodule] not used
+    #[cfg(feature = "bdf")]
+    m.add_class::<bdf::pyoil_bdf::PyClass>()?;
+
+    #[cfg(feature = "sdirk")]
+    m.add_class::<sdirk::pyoil_sdirk::PyClass>()?;
+
+    // Main docstring coded rather than /// comment because #[pymodule] not used
     m.setattr("__doc__", format!("Wrapper for {} diffsol type", &MODULE_NAME))?;
     parent_module.add_submodule(&m)
 }

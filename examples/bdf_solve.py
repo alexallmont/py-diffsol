@@ -1,4 +1,4 @@
-from diffsol import nalgebra_dense_f64 as ds
+from diffsol import nalgebra_dense_lu_f64 as ds
 
 context = ds.Context(
 """

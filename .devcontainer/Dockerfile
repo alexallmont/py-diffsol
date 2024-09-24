@@ -6,6 +6,7 @@ RUN apt install -y --no-install-recommends \
     llvm-16-dev \
     libpolly-16-dev \
     libclang-16-dev \
+    libsuitesparse-dev \
     python3.11-venv \
     python3.11-dev \
     && \
