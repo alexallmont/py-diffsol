@@ -4,29 +4,54 @@ use std::cell::RefCell;
 use pyo3::{
     prelude::*,
     Bound,
-    exceptions::PyValueError
+    exceptions::PyValueError,
 };
-use numpy::{PyArray1, PyArray2, PyArrayMethods, ToPyArray};
-use pyoil3::{pyoil3_class, pyoil3_ref_class};
+use diffsol::OdeSolverMethod;
+use numpy::{
+    PyArray1,
+    PyArray2,
+};
+use pyoil3::{
+    pyoil3_class,
+    pyoil3_ref_class,
+};
+use crate::convert::{
+    vec_v_to_pyarray,
+    vec_t_to_pyarray,
+};
 
 type V = <M as diffsol::matrix::MatrixCommon>::V;
 type T = <M as diffsol::matrix::MatrixCommon>::T;
 type Eqn<'a> = diffsol::ode_solver::diffsl::DiffSl<'a, M>;
-
-pub type BoundPyArray1<'py> = Bound<'py, PyArray1<T>>;
-pub type BoundPyArray2<'py> = Bound<'py, PyArray2<T>>;
 
 // Aliases for diffsol classes, by type where necessary
 type Context = diffsol::DiffSlContext<M>;
 type Problem<'a> = diffsol::OdeSolverProblem<Eqn<'a>>;
 type Builder = diffsol::OdeBuilder;
 
+/// BDF types, static lifetime required to bypass compile time lifetime checks
+type BdfCallable<'a> = diffsol::op::bdf::BdfCallable<Eqn<'a>>;
+type Bdf<'a> = diffsol::Bdf::<
+    M,
+    Eqn<'a>,
+    diffsol::NewtonNonlinearSolver<
+        BdfCallable<'a>,
+        <M as diffsol::DefaultSolver>::LS::<BdfCallable<'a>>
+    >
+>;
+
+/* // FIXME review types
+type SdirkCallable<'a> = diffsol::op::sdirk::SdirkCallable<Eqn<'a>>;
+type Sdirk<'a> = diffsol::Sdirk::<
+    M,
+    diffsol::linear_solver::FaerLU<SdirkCallable<'a>>,
+    Eqn<'a>
+>; */
+
 // Wrapped ref cells for diffsol classes that require mutation
 type BuilderRefCell = RefCell<diffsol::OdeBuilder>;
 type ProblemRefCell = RefCell<diffsol::OdeSolverProblem<M>>;
-
-// Solver problem is aliased as pyoil3 cannot parse generics
-type SolverProblem<'a> = diffsol::OdeSolverProblem<Eqn<'a>>;
+type BdfRefCell = RefCell<Bdf<'static>>;
 
 
 // -----------------------------------------------------------------------------
@@ -49,26 +74,16 @@ impl pyoil_context::PyClass {
 // -----------------------------------------------------------------------------
 // Problem class
 // -----------------------------------------------------------------------------
-pyoil3_ref_class!(
-    "Problem",
-    Problem,
-    pyoil_problem,
-    pyoil_context
-);
+pyoil3_ref_class!("Problem", Problem, pyoil_problem, pyoil_context);
 
 
 // -----------------------------------------------------------------------------
 // Builder class
 // -----------------------------------------------------------------------------
-pyoil3_class!(
-    "Builder",
-    BuilderRefCell,
-    pyoil_builder
-);
+pyoil3_class!("Builder", BuilderRefCell, pyoil_builder);
 
-// Call an OdeBuilder builder method on the container object to allow the fluent
-// builder class to change the underlying diffsol builder class, by operating
-// `tx` on it and replacing the original RefCell with the builder response.
+// Helper for fluent builder interface to apply `tx` function to underlying
+// diffsol class. Takes the original value, applies `tx` and replaces with new.
 fn _apply_builder_fn<F: Fn(Builder) -> Builder>(
     builder: &pyoil_builder::ArcHandle,
     tx: F
@@ -130,10 +145,8 @@ impl pyoil_builder::PyClass {
         slf: PyRefMut<'p, Self>,
         context: PyRef<'p, pyoil_context::PyClass>
     ) -> PyResult<pyoil_problem::PyClass> {
-        // FIXME replace unwraps
         let builder_guard = slf.0.lock().unwrap();
         let context_guard = context.0.lock().unwrap();
-
         let builder = builder_guard.instance.take();
         let instance = &context_guard.instance;
         let problem = builder.build_diffsl(instance).unwrap();
@@ -142,6 +155,86 @@ impl pyoil_builder::PyClass {
             context.0.clone()
         );
         Ok(result)
+    }
+}
+
+
+// -----------------------------------------------------------------------------
+// SolverStopReason class
+// -----------------------------------------------------------------------------
+#[pyclass(name = "SolverStopReason")]
+pub enum SolverStopReason {
+    InternalTimestep { },
+    RootFound { root: T },
+    TstopReached { },
+}
+
+type SolverStopReasonT = diffsol::OdeSolverStopReason<T>;
+impl From<SolverStopReasonT> for SolverStopReason {
+    fn from(value: SolverStopReasonT) -> Self {
+        match value {
+            SolverStopReasonT::InternalTimestep => SolverStopReason::InternalTimestep { },
+            SolverStopReasonT::RootFound(root) => SolverStopReason::RootFound { root },
+            SolverStopReasonT::TstopReached => SolverStopReason::TstopReached { },
+        }
+    }
+}
+
+
+// -----------------------------------------------------------------------------
+// Bdf solver class
+// -----------------------------------------------------------------------------
+pyoil3_class!("Bdf", BdfRefCell, pyoil_bdf);
+
+#[pymethods]
+impl pyoil_bdf::PyClass {
+    #[new]
+    pub fn new() -> pyoil_bdf::PyClass {
+        pyoil_bdf::PyClass::bind_instance(
+            RefCell::new(Bdf::default())
+        )
+    }
+
+    pub fn step<'py>(
+        slf: PyRefMut<'py, Self>
+    ) -> PyResult<SolverStopReason> {
+        let solver_guard = slf.0.lock().unwrap();
+        let mut solver = solver_guard.instance.borrow_mut();
+        let result = solver.step();
+        let state = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+        Ok(SolverStopReason::from(state))
+    }
+
+    pub fn solve<'py>(
+        slf: PyRefMut<'py, Self>,
+        problem: &pyoil_problem::PyClass,
+        final_time: Option<T>
+    ) -> PyResult<(Bound<'py, PyArray2<f64>>, Bound<'py, PyArray1<f64>>)> {
+        let solver_guard = slf.0.lock().unwrap();
+        let mut solver = solver_guard.instance.borrow_mut();
+
+        let problem_guard = problem.0.lock().unwrap();
+        let final_time = final_time.unwrap_or(1.0);
+        let result = solver.solve(&problem_guard.ref_static, final_time);
+        let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+        Ok((
+            vec_v_to_pyarray::<M>(slf.py(), &y),
+            vec_t_to_pyarray(slf.py(), &t),
+        ))
+    }
+
+    fn solve_dense<'py>(
+        slf: PyRefMut<'py, Self>,
+        problem: &pyoil_problem::PyClass,
+        t_eval: Vec<T>
+    ) -> PyResult<Bound<'py, PyArray2<f64>>> {
+        let solver_guard = slf.0.lock().unwrap();
+        let mut solver = solver_guard.instance.borrow_mut();
+        let problem_guard = problem.0.lock().unwrap();
+        let result = solver.solve_dense(&problem_guard.ref_static, &t_eval);
+        let values = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
+        let pyarray = vec_v_to_pyarray::<M>(slf.py(), &values);
+        Ok(pyarray)
     }
 }
 
@@ -156,6 +249,7 @@ pub fn add_to_parent_module(
     m.add_class::<pyoil_context::PyClass>()?;
     m.add_class::<pyoil_problem::PyClass>()?;
     m.add_class::<pyoil_builder::PyClass>()?;
+    m.add_class::<pyoil_bdf::PyClass>()?;
 
     // Module docstring has to be programatic because #[pymodule] not used
     m.setattr("__doc__", format!("Wrapper for {} diffsol type", &MODULE_NAME))?;
