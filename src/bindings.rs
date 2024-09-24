@@ -189,8 +189,10 @@ mod bdf {
     impl pyoil_bdf::PyClass {
         #[new]
         pub fn new() -> pyoil_bdf::PyClass {
+            let linear_solver = LS::default();
+            let nonlinear_solver = diffsol::NewtonNonlinearSolver::new(linear_solver);
             pyoil_bdf::PyClass::bind_instance(
-                RefCell::new(Bdf::default())
+                RefCell::new(Bdf::new(nonlinear_solver))
             )
         }
 
@@ -217,7 +219,7 @@ mod bdf {
             let result = solver.solve(&problem_guard.ref_static, final_time);
             let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
             Ok((
-                vec_v_to_pyarray::<DM>(slf.py(), &y), // FIXME make into type
+                vec_v_to_pyarray::<DM>(slf.py(), &y),
                 vec_t_to_pyarray(slf.py(), &t),
             ))
         }
@@ -249,8 +251,8 @@ mod sdirk {
     type SdirkCallable<'a> = diffsol::op::sdirk::SdirkCallable<Eqn<'a>>;
     type Sdirk<'a> = diffsol::Sdirk::<
         DM,
-        LS::<SdirkCallable<'a>>,
-        Eqn<'a>
+        Eqn<'a>,
+        LS::<SdirkCallable<'a>>
     >;
     type SdirkRefCell = RefCell<Sdirk<'static>>;
 
@@ -262,7 +264,7 @@ mod sdirk {
         pub fn new() -> pyoil_sdirk::PyClass {
             let tableau = diffsol::Tableau::<DM>::tr_bdf2();
             pyoil_sdirk::PyClass::bind_instance(
-            RefCell::new(diffsol::Sdirk::new(tableau, LinearSolver::default()))
+                RefCell::new(diffsol::Sdirk::new(tableau, LS::default()))
             )
         }
 
@@ -289,7 +291,7 @@ mod sdirk {
             let result = solver.solve(&problem_guard.ref_static, final_time);
             let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
             Ok((
-                vec_v_to_pyarray::<M>(slf.py(), &y),
+                vec_v_to_pyarray::<DM>(slf.py(), &y),
                 vec_t_to_pyarray(slf.py(), &t),
             ))
         }
@@ -304,7 +306,7 @@ mod sdirk {
             let problem_guard = problem.0.lock().unwrap();
             let result = solver.solve_dense(&problem_guard.ref_static, &t_eval);
             let values = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-            let pyarray = vec_v_to_pyarray::<M>(slf.py(), &values);
+            let pyarray = vec_v_to_pyarray::<DM>(slf.py(), &values);
             Ok(pyarray)
         }
     }
