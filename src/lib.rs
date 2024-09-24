@@ -2,33 +2,22 @@ use pyo3::prelude::*;
 
 mod convert;
 mod solver_class;
+mod create_binding;
 
-#[path = "."]
-mod nalgebra_dense_lu_f64 {
-    static MODULE_NAME:&'static str = "nalgebra_dense_lu_f64";
-    type Matrix = nalgebra::DMatrix<f64>;
-    type LinearSolver<Op> = diffsol::NalgebraLU<f64, Op>;
-    mod bindings;
-    pub use bindings::*;
-}
+// nalgebra_dense_lu_f64
+type MatrixNaLu = nalgebra::DMatrix<f64>;
+type SolverNaLu<Op> = ::diffsol::NalgebraLU<f64, Op>;
+create_binding!(nalgebra_dense_lu_f64, MatrixNaLu, SolverNaLu);
 
-#[path = "."]
-mod faer_sparse_lu_f64 {
-    static MODULE_NAME:&'static str = "faer_sparse_lu_f64";
-    type Matrix = diffsol::SparseColMat<f64>;
-    type LinearSolver<Op> = diffsol::FaerSparseLU<f64, Op>;
-    mod bindings;
-    pub use bindings::*;
-}
+// faer_sparse_lu_f64
+type MatrixFaLu = ::diffsol::SparseColMat<f64>;
+type SolverFaLu<Op> = ::diffsol::FaerSparseLU<f64, Op>;
+create_binding!(faer_sparse_lu_f64, MatrixFaLu, SolverFaLu);
 
-#[path = "."]
-mod faer_sparse_klu_f64 {
-    static MODULE_NAME:&'static str = "faer_sparse_klu_f64";
-    type Matrix = diffsol::SparseColMat<f64>;
-    type LinearSolver<Op> = diffsol::KLU<Matrix, Op>;
-    mod bindings;
-    pub use bindings::*;
-}
+// faer_sparse_klu_f64
+type MatrixFaKlu = ::diffsol::SparseColMat<f64>;
+type SolverFaKlu<Op> = ::diffsol::KLU<MatrixFaKlu, Op>;
+create_binding!(faer_sparse_klu_f64, MatrixFaKlu, SolverFaKlu);
 
 /// Top-level typed diffsol bindings
 #[pymodule]
