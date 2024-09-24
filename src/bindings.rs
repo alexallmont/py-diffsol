@@ -19,6 +19,7 @@ use crate::convert::{
     vec_v_to_pyarray,
     vec_t_to_pyarray,
 };
+use crate::solver_class;
 
 type M = Matrix;
 type LS<Op> = LinearSolver<Op>;
@@ -167,150 +168,44 @@ impl From<SolverStopReasonT> for SolverStopReason {
 // -----------------------------------------------------------------------------
 // Bdf solver class
 // -----------------------------------------------------------------------------
-#[cfg(feature = "bdf")]
-mod bdf {
-    use super::*;
+type BdfCallable<'a> = diffsol::op::bdf::BdfCallable<Eqn<'a>>;
+type BdfNonLinearSolver<'a> = diffsol::NewtonNonlinearSolver<
+    BdfCallable<'a>,
+    LS<BdfCallable<'a>>
+>;
+type Bdf<'a> = diffsol::Bdf::<
+    DM,
+    Eqn<'a>,
+    BdfNonLinearSolver<'a>
+>;
+type BdfRefCell = RefCell<Bdf<'static>>;
 
-    type BdfCallable<'a> = diffsol::op::bdf::BdfCallable<Eqn<'a>>;
-    type BdfNonLinearSolver<'a> = diffsol::NewtonNonlinearSolver<
-        BdfCallable<'a>,
-        LS<BdfCallable<'a>>
-    >;
-    type Bdf<'a> = diffsol::Bdf::<
-        DM,
-        Eqn<'a>,
-        BdfNonLinearSolver<'a>
-    >;
-    type BdfRefCell = RefCell<Bdf<'static>>;
-
-    pyoil3_class!("Bdf", BdfRefCell, pyoil_bdf);
-
-    #[pymethods]
-    impl pyoil_bdf::PyClass {
-        #[new]
-        pub fn new() -> pyoil_bdf::PyClass {
-            let linear_solver = LS::default();
-            let nonlinear_solver = diffsol::NewtonNonlinearSolver::new(linear_solver);
-            pyoil_bdf::PyClass::bind_instance(
-                RefCell::new(Bdf::new(nonlinear_solver))
-            )
-        }
-
-        pub fn step<'py>(
-            slf: PyRefMut<'py, Self>
-        ) -> PyResult<SolverStopReason> {
-            let solver_guard = slf.0.lock().unwrap();
-            let mut solver = solver_guard.instance.borrow_mut();
-            let result = solver.step();
-            let state = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-            Ok(SolverStopReason::from(state))
-        }
-
-        pub fn solve<'py>(
-            slf: PyRefMut<'py, Self>,
-            problem: &pyoil_problem::PyClass,
-            final_time: Option<T>
-        ) -> PyResult<(Bound<'py, PyArray2<f64>>, Bound<'py, PyArray1<f64>>)> {
-            let solver_guard = slf.0.lock().unwrap();
-            let mut solver = solver_guard.instance.borrow_mut();
-
-            let problem_guard = problem.0.lock().unwrap();
-            let final_time = final_time.unwrap_or(1.0);
-            let result = solver.solve(&problem_guard.ref_static, final_time);
-            let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-            Ok((
-                vec_v_to_pyarray::<DM>(slf.py(), &y),
-                vec_t_to_pyarray(slf.py(), &t),
-            ))
-        }
-
-        fn solve_dense<'py>(
-            slf: PyRefMut<'py, Self>,
-            problem: &pyoil_problem::PyClass,
-            t_eval: Vec<T>
-        ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-            let solver_guard = slf.0.lock().unwrap();
-            let mut solver = solver_guard.instance.borrow_mut();
-            let problem_guard = problem.0.lock().unwrap();
-            let result = solver.solve_dense(&problem_guard.ref_static, &t_eval);
-            let values = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-            let pyarray = vec_v_to_pyarray::<DM>(slf.py(), &values);
-            Ok(pyarray)
-        }
-    }
+fn bdf_constructor<'a>() -> Bdf<'a> {
+    let linear_solver = LS::default();
+    let nonlinear_solver = diffsol::NewtonNonlinearSolver::new(linear_solver);
+    Bdf::new(nonlinear_solver)
 }
+
+solver_class!("Bdf", BdfRefCell, pyoil_bdf, bdf_constructor);
+
 
 // -----------------------------------------------------------------------------
 // SDIRK solver class
 // -----------------------------------------------------------------------------
-#[cfg(feature = "sdirk")]
-mod sdirk {
-    // FIXME refactor to remove duplicate BDF code
-    use super::*;
+type SdirkCallable<'a> = diffsol::op::sdirk::SdirkCallable<Eqn<'a>>;
+type Sdirk<'a> = diffsol::Sdirk::<
+    DM,
+    Eqn<'a>,
+    LS::<SdirkCallable<'a>>
+>;
+type SdirkRefCell = RefCell<Sdirk<'static>>;
 
-    type SdirkCallable<'a> = diffsol::op::sdirk::SdirkCallable<Eqn<'a>>;
-    type Sdirk<'a> = diffsol::Sdirk::<
-        DM,
-        Eqn<'a>,
-        LS::<SdirkCallable<'a>>
-    >;
-    type SdirkRefCell = RefCell<Sdirk<'static>>;
-
-    pyoil3_class!("Sdirk", SdirkRefCell, pyoil_sdirk);
-
-    #[pymethods]
-    impl pyoil_sdirk::PyClass {
-        #[new]
-        pub fn new() -> pyoil_sdirk::PyClass {
-            let tableau = diffsol::Tableau::<DM>::tr_bdf2();
-            pyoil_sdirk::PyClass::bind_instance(
-                RefCell::new(diffsol::Sdirk::new(tableau, LS::default()))
-            )
-        }
-
-        pub fn step<'py>(
-            slf: PyRefMut<'py, Self>
-        ) -> PyResult<SolverStopReason> {
-            let solver_guard = slf.0.lock().unwrap();
-            let mut solver = solver_guard.instance.borrow_mut();
-            let result = solver.step();
-            let state = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-            Ok(SolverStopReason::from(state))
-        }
-
-        pub fn solve<'py>(
-            slf: PyRefMut<'py, Self>,
-            problem: &pyoil_problem::PyClass,
-            final_time: Option<T>
-        ) -> PyResult<(Bound<'py, PyArray2<f64>>, Bound<'py, PyArray1<f64>>)> {
-            let solver_guard = slf.0.lock().unwrap();
-            let mut solver = solver_guard.instance.borrow_mut();
-
-            let problem_guard = problem.0.lock().unwrap();
-            let final_time = final_time.unwrap_or(1.0);
-            let result = solver.solve(&problem_guard.ref_static, final_time);
-            let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-            Ok((
-                vec_v_to_pyarray::<DM>(slf.py(), &y),
-                vec_t_to_pyarray(slf.py(), &t),
-            ))
-        }
-
-        fn solve_dense<'py>(
-            slf: PyRefMut<'py, Self>,
-            problem: &pyoil_problem::PyClass,
-            t_eval: Vec<T>
-        ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-            let solver_guard = slf.0.lock().unwrap();
-            let mut solver = solver_guard.instance.borrow_mut();
-            let problem_guard = problem.0.lock().unwrap();
-            let result = solver.solve_dense(&problem_guard.ref_static, &t_eval);
-            let values = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-            let pyarray = vec_v_to_pyarray::<DM>(slf.py(), &values);
-            Ok(pyarray)
-        }
-    }
+fn sdirk_constructor<'a>() -> Sdirk<'a> {
+    let tableau = diffsol::Tableau::<DM>::tr_bdf2();
+    diffsol::Sdirk::new(tableau, LS::default())
 }
+
+solver_class!("Sdirk", SdirkRefCell, pyoil_sdirk, sdirk_constructor);
 
 
 // -----------------------------------------------------------------------------
@@ -324,12 +219,8 @@ pub fn add_to_parent_module(
     m.add_class::<pyoil_context::PyClass>()?;
     m.add_class::<pyoil_problem::PyClass>()?;
     m.add_class::<pyoil_builder::PyClass>()?;
-
-    #[cfg(feature = "bdf")]
-    m.add_class::<bdf::pyoil_bdf::PyClass>()?;
-
-    #[cfg(feature = "sdirk")]
-    m.add_class::<sdirk::pyoil_sdirk::PyClass>()?;
+    m.add_class::<pyoil_bdf::PyClass>()?;
+    m.add_class::<pyoil_sdirk::PyClass>()?;
 
     // Main docstring coded rather than /// comment because #[pymodule] not used
     m.setattr("__doc__", format!("Wrapper for {} diffsol type", &MODULE_NAME))?;

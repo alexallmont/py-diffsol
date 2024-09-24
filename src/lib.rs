@@ -1,8 +1,8 @@
 use pyo3::prelude::*;
 
 mod convert;
+mod solver_class;
 
-#[cfg(feature = "nalgebra_dense_lu_f64")]
 #[path = "."]
 mod nalgebra_dense_lu_f64 {
     static MODULE_NAME:&'static str = "nalgebra_dense_lu_f64";
@@ -12,7 +12,6 @@ mod nalgebra_dense_lu_f64 {
     pub use bindings::*;
 }
 
-#[cfg(feature = "faer_sparse_lu_f64")]
 #[path = "."]
 mod faer_sparse_lu_f64 {
     static MODULE_NAME:&'static str = "faer_sparse_lu_f64";
@@ -22,7 +21,6 @@ mod faer_sparse_lu_f64 {
     pub use bindings::*;
 }
 
-#[cfg(feature = "faer_sparse_klu_f64")]
 #[path = "."]
 mod faer_sparse_klu_f64 {
     static MODULE_NAME:&'static str = "faer_sparse_klu_f64";
@@ -35,15 +33,8 @@ mod faer_sparse_klu_f64 {
 /// Top-level typed diffsol bindings
 #[pymodule]
 fn diffsol(m: &Bound<'_, PyModule>) -> PyResult<()> {
-
-    #[cfg(feature = "nalgebra_dense_lu_f64")]
     nalgebra_dense_lu_f64::add_to_parent_module(m)?;
-
-    #[cfg(feature = "faer_sparse_lu_f64")]
     faer_sparse_lu_f64::add_to_parent_module(m)?;
-
-    #[cfg(feature = "faer_sparse_klu_f64")]
     faer_sparse_klu_f64::add_to_parent_module(m)?;
-
     Ok(())
 }
