@@ -1,8 +1,8 @@
 import numpy as np
-import diffsol
+from diffsol import nalgebra_dense_lu_f64 as ds
 
 def test_logistic_growth():
-    context = diffsol.OdeSolverContext(
+    context = ds.Context(
     """
         in = [r, k, y0]
         r { 1 } k { 1 } y0 { 1 }
@@ -15,9 +15,9 @@ def test_logistic_growth():
     r = 1.0
     k = 10.0
     y0 = 0.1
-    builder = diffsol.OdeBuilder().rtol(1e-6).p([r, k, y0])
+    builder = ds.Builder().rtol(1e-6).p([r, k, y0])
     problem = builder.build_diffsl(context)
-    solver = diffsol.Bdf()
+    solver = ds.Bdf()
     ys, ts = solver.solve(problem)
     for t, y in zip(ts, ys):
         expect = k*y0/(y0 + (k - y0)*np.exp(-r*t))
@@ -31,7 +31,7 @@ def test_robertson_ode():
     #    dy1/dt = -.04*y1 + 1.e4*y2*y3
     #    dy2/dt = .04*y1 - 1.e4*y2*y3 - 3.e7*(y2)^2
     #    dy3/dt = 3.e7*(y2)^2
-    context = diffsol.OdeSolverContext(
+    context = ds.Context(
     """
         in = [a, b, c]
         a { 1 } b { 1 } c { 1 }
@@ -45,9 +45,9 @@ def test_robertson_ode():
     """
     )
 
-    builder = diffsol.OdeBuilder().rtol(1e-4).atol([1.e-8, 1.e-14, 1.e-6]).p([0.04, 1.e4, 3.e7])
+    builder = ds.Builder().rtol(1e-4).atol([1.e-8, 1.e-14, 1.e-6]).p([0.04, 1.e4, 3.e7])
     problem = builder.build_diffsl(context)
-    solver = diffsol.Bdf()
+    solver = ds.Bdf()
     t_eval = [0.0, 0.4, 4.0, 40.0, 400.0, 4000.0, 40000.0, 400000.0, 4000000.0, 4.0e7, 4.0e8, 4.0e9, 4.0e10]
     ys = solver.solve_dense(problem, t_eval)
 
