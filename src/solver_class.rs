@@ -1,3 +1,5 @@
+// Python wrapper for diffsol/src/ode_solver/method.rs
+
 #[macro_export]
 macro_rules! solver_class {
     (
@@ -25,6 +27,12 @@ macro_rules! solver_class {
                 let result = solver.step();
                 let state = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
                 Ok(SolverStopReason::from(state))
+            }
+
+            fn order<'py>(slf: PyRefMut<'py, Self>) -> PyResult<u64> {
+                let solver_guard = slf.0.lock().unwrap();
+                let solver = solver_guard.instance.borrow();
+                Ok(solver.order() as u64)
             }
 
             pub fn solve<'py>(
