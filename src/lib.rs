@@ -1,5 +1,8 @@
 use pyo3::prelude::*;
 
+#[macro_use]
+mod pyoil3_class;
+
 mod convert;
 mod solver_class;
 mod create_binding;

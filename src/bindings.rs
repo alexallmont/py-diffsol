@@ -11,10 +11,7 @@ use numpy::{
     PyArray1,
     PyArray2,
 };
-use pyoil3::{
-    pyoil3_class,
-    pyoil3_ref_class,
-};
+use crate::pyoil3_class;
 use crate::convert::{
     vec_v_to_pyarray,
     vec_t_to_pyarray,

@@ -1177,7 +1177,6 @@ dependencies = [
  "numpy",
  "pyo3",
  "pyo3-build-config",
- "pyoil3",
  "rust-numpy",
 ]
 
@@ -1255,14 +1254,6 @@ dependencies = [
  "pyo3-build-config",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "pyoil3"
-version = "0.1.0"
-source = "git+https://github.com/alexallmont/pyoil3.git#a7f63545e2f792ab21a51c733fb6ee2f8f8338dc"
-dependencies = [
- "pyo3",
 ]
 
 [[package]]
