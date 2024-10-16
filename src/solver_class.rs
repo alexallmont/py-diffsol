@@ -8,13 +8,13 @@ macro_rules! solver_class {
         $InterfaceHandle:tt,
         $ConstructorFn:tt
     ) => {
-        pyoil3_class!($PyApiName, $RustType, $InterfaceHandle);
+        py_class!($PyApiName, $RustType, $InterfaceHandle);
 
         #[pymethods]
         impl $InterfaceHandle::PyClass {
             #[new]
             pub fn new() -> $InterfaceHandle::PyClass {
-                $InterfaceHandle::PyClass::bind_instance(
+                $InterfaceHandle::PyClass::new_binding(
                     RefCell::new($ConstructorFn())
                 )
             }
@@ -22,48 +22,47 @@ macro_rules! solver_class {
             pub fn step<'py>(
                 slf: PyRefMut<'py, Self>
             ) -> PyResult<SolverStopReason> {
-                let solver_guard = slf.0.lock().unwrap();
-                let mut solver = solver_guard.instance.borrow_mut();
-                let result = solver.step();
-                let state = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-                Ok(SolverStopReason::from(state))
+                slf.use_inst(|solver| {
+                    let state = solver.borrow_mut().step().map_err(diffsol_err)?;
+                    Ok(SolverStopReason::from(state))
+                })
             }
 
-            fn order<'py>(slf: PyRefMut<'py, Self>) -> PyResult<u64> {
-                let solver_guard = slf.0.lock().unwrap();
-                let solver = solver_guard.instance.borrow();
-                Ok(solver.order() as u64)
+            pub fn order<'py>(slf: PyRefMut<'py, Self>) -> u64 {
+                slf.use_inst(|solver| { solver.borrow().order() }) as u64
             }
 
             pub fn solve<'py>(
                 slf: PyRefMut<'py, Self>,
-                problem: &pyoil_problem::PyClass,
+                problem: &py_problem::PyClass,
                 final_time: Option<T>
             ) -> PyResult<(Bound<'py, PyArray2<f64>>, Bound<'py, PyArray1<f64>>)> {
-                let solver_guard = slf.0.lock().unwrap();
-                let mut solver = solver_guard.instance.borrow_mut();
-                let problem_guard = problem.0.lock().unwrap();
-                let final_time = final_time.unwrap_or(1.0);
-                let result = solver.solve(&problem_guard.ref_static, final_time);
-                let (y, t) = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-                Ok((
-                    vec_v_to_pyarray::<DM>(slf.py(), &y),
-                    vec_t_to_pyarray(slf.py(), &t),
-                ))
+                slf.use_inst(|solver| {
+                    let mut solver = solver.borrow_mut();
+                    problem.use_inst(|prb| {
+                        let final_time = final_time.unwrap_or(1.0);
+                        let (y, t) = solver.solve(prb, final_time).map_err(diffsol_err)?;
+                        Ok((
+                            vec_v_to_pyarray::<DM>(slf.py(), &y),
+                            vec_t_to_pyarray(slf.py(), &t),
+                        ))
+                    })
+                })
             }
 
             fn solve_dense<'py>(
                 slf: PyRefMut<'py, Self>,
-                problem: &pyoil_problem::PyClass,
+                problem: &py_problem::PyClass,
                 t_eval: Vec<T>
             ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-                let solver_guard = slf.0.lock().unwrap();
-                let mut solver = solver_guard.instance.borrow_mut();
-                let problem_guard = problem.0.lock().unwrap();
-                let result = solver.solve_dense(&problem_guard.ref_static, &t_eval);
-                let values = result.map_err(|err| PyValueError::new_err(err.to_string()))?;
-                let pyarray = vec_v_to_pyarray::<DM>(slf.py(), &values);
-                Ok(pyarray)
+                slf.use_inst(|solver| {
+                    let mut solver = solver.borrow_mut();
+                    problem.use_inst(|prb| {
+                        let values = solver.solve_dense(prb, &t_eval).map_err(diffsol_err)?;
+                        let pyarray = vec_v_to_pyarray::<DM>(slf.py(), &values);
+                        Ok(pyarray)
+                    })
+                })
             }
         }
     };

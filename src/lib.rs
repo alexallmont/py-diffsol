@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 
 #[macro_use]
-mod pyoil3_class;
+mod py_class;
 
 mod convert;
 mod solver_class;

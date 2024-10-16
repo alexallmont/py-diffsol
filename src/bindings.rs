@@ -11,13 +11,13 @@ use numpy::{
     PyArray1,
     PyArray2,
 };
-use crate::pyoil3_class;
 use crate::convert::{
     vec_v_to_pyarray,
     vec_t_to_pyarray,
 };
 use crate::solver_class;
 
+/// Types for this module's binding derived from super:: settings
 type M = Matrix;
 type LS<Op> = LinearSolver<Op>;
 type V = <M as diffsol::matrix::MatrixCommon>::V;
@@ -25,25 +25,28 @@ type T = <M as diffsol::matrix::MatrixCommon>::T;
 type DM = <V as diffsol::DefaultDenseMatrix>::M;
 type Eqn<'a> = diffsol::ode_solver::diffsl::DiffSl<'a, M>;
 
-// Aliases for diffsol classes, by type where necessary
-type Context = diffsol::DiffSlContext<M>;
-type Problem<'a> = diffsol::OdeSolverProblem<Eqn<'a>>;
-type Builder = diffsol::OdeBuilder;
+
+/// Convert common diffsol errors to PyErrors
+fn diffsol_err(err: diffsol::error::DiffsolError) -> PyErr {
+    PyValueError::new_err(err.to_string())
+}
 
 
 // -----------------------------------------------------------------------------
 // Context class
 // -----------------------------------------------------------------------------
-pyoil3_class!("Context", Context, pyoil_context);
+type Context = diffsol::DiffSlContext<M>;
+
+py_class!("Context", Context, py_context);
 
 #[pymethods]
-impl pyoil_context::PyClass {
+impl py_context::PyClass {
     #[new]
     pub fn new(code: &str) -> PyResult<Self> {
         // Create a native diffsl context from the code, and wrap in Context
         let context = diffsol::DiffSlContext::new(code);
-        let inst = context.map_err(|err| PyValueError::new_err(err.to_string()))?;
-        Ok(pyoil_context::PyClass::bind_instance(inst))
+        let inst = context.map_err(diffsol_err)?;
+        Ok(py_context::PyClass::new_binding(inst))
     }
 }
 
@@ -51,37 +54,44 @@ impl pyoil_context::PyClass {
 // -----------------------------------------------------------------------------
 // Problem class
 // -----------------------------------------------------------------------------
-type ProblemRefCell = RefCell<diffsol::OdeSolverProblem<M>>;
+type Problem<'a> = diffsol::OdeSolverProblem<Eqn<'a>>;
 
-pyoil3_ref_class!("Problem", Problem, pyoil_problem, pyoil_context);
+py_class_dependant!("Problem", Problem, py_problem, py_context);
 
 
 // -----------------------------------------------------------------------------
 // Builder class
 // -----------------------------------------------------------------------------
-type BuilderRefCell = RefCell<diffsol::OdeBuilder>;
+type Builder = RefCell<diffsol::OdeBuilder>; // RefCell for take/replace below
 
-pyoil3_class!("Builder", BuilderRefCell, pyoil_builder);
+py_class!("Builder", Builder, py_builder);
 
 // Helper for fluent builder interface to apply `tx` function to underlying
 // diffsol class. Takes the original value, applies `tx` and replaces with new.
-// Return of original py reference improves brevity in usage.
-fn apply_builder_fn<'p, TxFn: Fn(Builder) -> Builder>(
-    builder: PyRefMut<'p, pyoil_builder::PyClass>,
-    tx: TxFn
-) -> PyRefMut<'p, pyoil_builder::PyClass> {
-    let clone = builder.0.clone();
-    let guard = clone.lock().unwrap();
-    let transformed = tx(guard.instance.take());
-    guard.instance.replace(transformed);
+fn apply_builder_fn<'p, TxFn>(
+    builder: PyRefMut<'p, py_builder::PyClass>,
+    tx_fn: TxFn
+) -> PyRefMut<'p, py_builder::PyClass>
+where
+    TxFn: Fn(diffsol::OdeBuilder) -> diffsol::OdeBuilder
+{
+    builder.use_inst(|builder| {
+        // Take and replace of RefCell required to support underlying OdeBuilder
+        // API which consumes a value and returns a new instance.
+        let new_builder = tx_fn(builder.take());
+        builder.replace(new_builder);
+    });
+
+    // Return of self here for brevity below; i.e. each method does not need an
+    // additional trailing `slf`, it happens here instead.
     builder
 }
 
 #[pymethods]
-impl pyoil_builder::PyClass {
+impl py_builder::PyClass {
     #[new]
     pub fn new() -> Self {
-        Self::bind_instance(RefCell::new(Builder::new()))
+        Self::new_binding(RefCell::new(diffsol::OdeBuilder::new()))
     }
 
     pub fn t0<'p>(slf: PyRefMut<'p, Self>, t0: f64) -> PyRefMut<'p, Self> {
@@ -118,18 +128,19 @@ impl pyoil_builder::PyClass {
 
     pub fn build_diffsl<'p>(
         slf: PyRefMut<'p, Self>,
-        context: PyRef<'p, pyoil_context::PyClass>
-    ) -> PyResult<pyoil_problem::PyClass> {
-        let builder_guard = slf.0.lock().unwrap();
-        let context_guard = context.0.lock().unwrap();
-        let builder = builder_guard.instance.take();
-        let instance = &context_guard.instance;
-        let problem = builder.build_diffsl(instance).unwrap();
-        let result = pyoil_problem::PyClass::bind_owned_instance(
-            problem,
-            context.0.clone()
-        );
-        Ok(result)
+        context: PyRef<'p, py_context::PyClass>
+    ) -> PyResult<py_problem::PyClass> {
+        slf.use_inst(|builder| {
+            context.use_inst(|ode_context| {
+                let ode_builder = builder.take();
+                let problem = ode_builder.build_diffsl(ode_context).unwrap();
+                let result = py_problem::PyClass::new_binding(
+                    problem,
+                    context.0.clone()
+                );
+                Ok(result)
+            })
+        })
     }
 }
 
@@ -159,44 +170,53 @@ impl From<SolverStopReasonT> for SolverStopReason {
 // -----------------------------------------------------------------------------
 // Bdf solver class
 // -----------------------------------------------------------------------------
+// Bdf requires a compile-time type definition rather than using Bdf::default()
+// which is idiomatic for diffsol using Rust's type dependencies. PyO3 needs a
+// pre-determined type to work with. Solvers are wrapped in RefCells because the
+// OdeSolverMethods require a mutable borrow. See `solver_class` macro for
+// implementation that exposes the common methods to python, with edge cases
+// like Bdf or Sdirk constructor function passed in as macro arguments.
 type BdfCallable<'a> = diffsol::op::bdf::BdfCallable<Eqn<'a>>;
 type BdfNonLinearSolver<'a> = diffsol::NewtonNonlinearSolver<
     BdfCallable<'a>,
     LS<BdfCallable<'a>>
 >;
-type Bdf<'a> = diffsol::Bdf::<
+type BdfType<'a> = diffsol::Bdf::<
     DM,
     Eqn<'a>,
     BdfNonLinearSolver<'a>
 >;
-type BdfRefCell = RefCell<Bdf<'static>>;
+type Bdf = RefCell<BdfType<'static>>; // RefCell for mutable borrows in calls
 
-fn bdf_constructor<'a>() -> Bdf<'a> {
+fn bdf_constructor<'a>() -> BdfType<'a> {
     let linear_solver = LS::default();
     let nonlinear_solver = diffsol::NewtonNonlinearSolver::new(linear_solver);
-    Bdf::new(nonlinear_solver)
+    BdfType::new(nonlinear_solver)
 }
 
-solver_class!("Bdf", BdfRefCell, pyoil_bdf, bdf_constructor);
+solver_class!("Bdf", Bdf, py_bdf, bdf_constructor);
 
 
 // -----------------------------------------------------------------------------
 // SDIRK solver class
 // -----------------------------------------------------------------------------
+// Like Bdf, Sdirk requires a compile-time type rather than idiomatic diffsol
+// default() for PyO3 needing a pre-determined type, and is wrapped in RefCell
+// and has a custom constructor.
 type SdirkCallable<'a> = diffsol::op::sdirk::SdirkCallable<Eqn<'a>>;
-type Sdirk<'a> = diffsol::Sdirk::<
+type SdirkType<'a> = diffsol::Sdirk::<
     DM,
     Eqn<'a>,
     LS::<SdirkCallable<'a>>
 >;
-type SdirkRefCell = RefCell<Sdirk<'static>>;
+type Sdirk = RefCell<SdirkType<'static>>; // RefCell for mutable borrows in calls
 
-fn sdirk_constructor<'a>() -> Sdirk<'a> {
+fn sdirk_constructor<'a>() -> SdirkType<'a> {
     let tableau = diffsol::Tableau::<DM>::tr_bdf2();
     diffsol::Sdirk::new(tableau, LS::default())
 }
 
-solver_class!("Sdirk", SdirkRefCell, pyoil_sdirk, sdirk_constructor);
+solver_class!("Sdirk", Sdirk, py_sdirk, sdirk_constructor);
 
 
 // -----------------------------------------------------------------------------
@@ -207,11 +227,11 @@ pub fn add_to_parent_module(
 ) -> PyResult<()> {
     let m = PyModule::new_bound(parent_module.py(), &MODULE_NAME)?;
 
-    m.add_class::<pyoil_context::PyClass>()?;
-    m.add_class::<pyoil_problem::PyClass>()?;
-    m.add_class::<pyoil_builder::PyClass>()?;
-    m.add_class::<pyoil_bdf::PyClass>()?;
-    m.add_class::<pyoil_sdirk::PyClass>()?;
+    m.add_class::<py_context::PyClass>()?;
+    m.add_class::<py_problem::PyClass>()?;
+    m.add_class::<py_builder::PyClass>()?;
+    m.add_class::<py_bdf::PyClass>()?;
+    m.add_class::<py_sdirk::PyClass>()?;
 
     // Main docstring coded rather than /// comment because #[pymodule] not used
     m.setattr("__doc__", format!("Wrapper for {} diffsol type", &MODULE_NAME))?;
