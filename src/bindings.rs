@@ -65,14 +65,16 @@ pyoil3_class!("Builder", BuilderRefCell, pyoil_builder);
 
 // Helper for fluent builder interface to apply `tx` function to underlying
 // diffsol class. Takes the original value, applies `tx` and replaces with new.
-fn _apply_builder_fn<F: Fn(Builder) -> Builder>(
-    builder: &pyoil_builder::ArcHandle,
-    tx: F
-) {
-    let cl = builder.clone();
-    let builder = cl.lock().unwrap();
-    let transformed = tx(builder.instance.take());
-    builder.instance.replace(transformed);
+// Return of original py reference improves brevity in usage.
+fn apply_builder_fn<'p, TxFn: Fn(Builder) -> Builder>(
+    builder: PyRefMut<'p, pyoil_builder::PyClass>,
+    tx: TxFn
+) -> PyRefMut<'p, pyoil_builder::PyClass> {
+    let clone = builder.0.clone();
+    let guard = clone.lock().unwrap();
+    let transformed = tx(guard.instance.take());
+    guard.instance.replace(transformed);
+    builder
 }
 
 #[pymethods]
@@ -83,43 +85,35 @@ impl pyoil_builder::PyClass {
     }
 
     pub fn t0<'p>(slf: PyRefMut<'p, Self>, t0: f64) -> PyRefMut<'p, Self> {
-        _apply_builder_fn(&slf.0, |t| t.t0(t0));
-        slf
+        apply_builder_fn(slf, |t| t.t0(t0))
     }
 
     pub fn sensitivities<'p>(slf: PyRefMut<'p, Self>, sensitivities: bool) -> PyRefMut<'p, Self> {
-        _apply_builder_fn(&slf.0, |t| t.sensitivities(sensitivities));
-        slf
+        apply_builder_fn(slf, |t| t.sensitivities(sensitivities))
     }
 
     pub fn sensitivities_error_control<'p>(slf: PyRefMut<'p, Self>, sensitivities_error_control: bool) -> PyRefMut<'p, Self> {
-        _apply_builder_fn(&slf.0, |t| t.sensitivities_error_control(sensitivities_error_control));
-        slf
+        apply_builder_fn(slf, |t| t.sensitivities_error_control(sensitivities_error_control))
     }
 
     pub fn h0<'p>(slf: PyRefMut<'p, Self>, h0: f64) -> PyRefMut<'p, Self> {
-        _apply_builder_fn(&slf.0, |t| t.h0(h0));
-        slf
+        apply_builder_fn(slf, |t| t.h0(h0))
     }
 
     pub fn rtol<'p>(slf: PyRefMut<'p, Self>, rtol: f64) -> PyRefMut<'p, Self> {
-        _apply_builder_fn(&slf.0, |t| t.rtol(rtol));
-        slf
+        apply_builder_fn(slf, |t| t.rtol(rtol))
     }
 
     pub fn atol<'p>(slf: PyRefMut<'p, Self>, atol: Vec<f64>) -> PyRefMut<'p, Self> {
-        _apply_builder_fn(&slf.0, |t| t.atol(atol.to_vec()));
-        slf
+        apply_builder_fn(slf, |t| t.atol(atol.to_vec()))
     }
 
     pub fn p<'p>(slf: PyRefMut<'p, Self>, p: Vec<f64>) -> PyRefMut<'p, Self> {
-        _apply_builder_fn(&slf.0, |t| t.p(p.to_vec()));
-        slf
+        apply_builder_fn(slf, |t| t.p(p.to_vec()))
     }
 
     pub fn use_coloring<'p>(slf: PyRefMut<'p, Self>, use_coloring: bool) -> PyRefMut<'p, Self> {
-        _apply_builder_fn(&slf.0, |t| t.use_coloring(use_coloring));
-        slf
+        apply_builder_fn(slf, |t| t.use_coloring(use_coloring))
     }
 
     pub fn build_diffsl<'p>(
