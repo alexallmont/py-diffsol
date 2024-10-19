@@ -13,12 +13,14 @@ macro_rules! create_binding {
     (
         $module_name:tt,
         $matrix_type:tt,
-        $solver_type:tt
+        $solver_type:tt,
+        $py_convert:tt
     ) => {
         #[path="."]
         pub mod $module_name {
             use super::$matrix_type;
             use super::$solver_type;
+            use super::$py_convert as py_convert;
 
             // Module name, underlying type name and type
             static MODULE_NAME:&'static str = stringify!($module_name);

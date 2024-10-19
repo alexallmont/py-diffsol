@@ -12,12 +12,11 @@ name = "diffsol"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.21.2", default-features = false }
+pyo3 = { version = "0.22", default-features = false }
 diffsol = { version = "0.2.1", features = ["diffsl-llvm16", "suitesparse"] }
-numpy = { version = "0.21.0", features = ["nalgebra"] }
+numpy = { version = "0.22", features = ["nalgebra"] }
 nalgebra = "0.33"
 faer = "0.18.2"
-rust-numpy = "0.1.0"
 
 [dev-dependencies]
 pyo3 = { version = "*", default-features = false, features = ["auto-initialize"] }

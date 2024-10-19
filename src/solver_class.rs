@@ -1,4 +1,8 @@
-// Python wrapper for diffsol/src/ode_solver/method.rs
+//! Python wrapper for diffsol/src/ode_solver/method.rs
+//! Implemented as macro as this is duplicated for all solver types, and having
+//! a macro generate a separate PyClass for each - instead of using a strategy
+//! pattern, for example - makes better use of PyO3's type system.
+//! Note that problem, take_state and checkpoint methods are ommitted by design.
 
 #[macro_export]
 macro_rules! solver_class {
@@ -19,32 +23,59 @@ macro_rules! solver_class {
                 )
             }
 
+            // TODO fn set_problem(&mut self, state: OdeSolverState<Eqn::V>, problem: &OdeSolverProblem<Eqn>);
+
             pub fn step<'py>(
                 slf: PyRefMut<'py, Self>
             ) -> PyResult<SolverStopReason> {
-                slf.use_inst(|solver| {
+                slf.lock(|solver| {
                     let state = solver.borrow_mut().step().map_err(diffsol_err)?;
                     Ok(SolverStopReason::from(state))
                 })
             }
 
-            pub fn order<'py>(slf: PyRefMut<'py, Self>) -> u64 {
-                slf.use_inst(|solver| { solver.borrow().order() }) as u64
+            // TODO fn set_stop_time(&mut self, tstop: Eqn::T) -> Result<(), DiffsolError>;
+            // TODO fn interpolate(&self, t: Eqn::T) -> Result<Eqn::V, DiffsolError>;
+            // TODO fn interpolate_sens(&self, t: Eqn::T) -> Result<Vec<Eqn::V>, DiffsolError>;
+
+            fn state<'py>(slf: PyRefMut<'py, Self>) -> PyResult<py_solver_state::PyClass> {
+                slf.lock(|solver| {
+                    if solver.borrow().state().is_none() {
+                        Err(str_err("Solver has no state"))
+                    } else {
+                        let result = py_solver_state::PyClass::new_binding(
+                            // Note that $RustType is used here to select SolverState::Bdf
+                            // or SolverState::Sdirk enum depending on solver type so the
+                            // state can be retrieved from the Arc<Mutex<solver>> later.
+                            SolverState::$RustType(slf.0.clone())
+                        );
+                        Ok(result)
+                    }
+                })
             }
 
+            // TODO fn state_mut(&mut self) -> Option<&mut OdeSolverState<Eqn::V>>;
+
+            pub fn order<'py>(slf: PyRefMut<'py, Self>) -> u64 {
+                slf.lock(|solver| { solver.borrow().order() }) as u64
+            }
+
+            #[pyo3(signature = (problem, final_time=1.0))]
             pub fn solve<'py>(
                 slf: PyRefMut<'py, Self>,
                 problem: &py_problem::PyClass,
-                final_time: Option<T>
-            ) -> PyResult<(Bound<'py, PyArray2<f64>>, Bound<'py, PyArray1<f64>>)> {
-                slf.use_inst(|solver| {
-                    let mut solver = solver.borrow_mut();
-                    problem.use_inst(|prb| {
-                        let final_time = final_time.unwrap_or(1.0);
-                        let (y, t) = solver.solve(prb, final_time).map_err(diffsol_err)?;
+                final_time: T
+            ) -> PyResult<(Bound<'py, PyList>, Bound<'py, PyArray1<f64>>)> {
+                slf.lock(|solver| {
+                    problem.lock(|prb| {
+                        let (y, t) = solver.borrow_mut().solve(
+                            prb,
+                            final_time
+                        ).map_err(diffsol_err)?;
+
                         Ok((
-                            vec_v_to_pyarray::<DM>(slf.py(), &y),
-                            vec_t_to_pyarray(slf.py(), &t),
+                            py_convert::vec_v_to_py(&y, slf.py()),
+                            py_convert::vec_t_to_py(&t, slf.py())
                         ))
                     })
                 })
@@ -54,13 +85,11 @@ macro_rules! solver_class {
                 slf: PyRefMut<'py, Self>,
                 problem: &py_problem::PyClass,
                 t_eval: Vec<T>
-            ) -> PyResult<Bound<'py, PyArray2<f64>>> {
-                slf.use_inst(|solver| {
-                    let mut solver = solver.borrow_mut();
-                    problem.use_inst(|prb| {
-                        let values = solver.solve_dense(prb, &t_eval).map_err(diffsol_err)?;
-                        let pyarray = vec_v_to_pyarray::<DM>(slf.py(), &values);
-                        Ok(pyarray)
+            ) -> PyResult<Bound<'py, PyList>> {
+                slf.lock(|solver| {
+                    problem.lock(|prb| {
+                        let values = solver.borrow_mut().solve_dense(prb, &t_eval).map_err(diffsol_err)?;
+                        Ok(py_convert::vec_v_to_py(&values, slf.py()))
                     })
                 })
             }

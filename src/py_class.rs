@@ -57,7 +57,7 @@ macro_rules! py_class {
                     PyClass(Arc::new(Mutex::new(inst)))
                 }
 
-                pub fn use_inst<UseFn, UseFnReturn>(&self, use_fn: UseFn) -> UseFnReturn
+                pub fn lock<UseFn, UseFnReturn>(&self, use_fn: UseFn) -> UseFnReturn
                 where
                     UseFn: FnOnce(&super::$RustType) -> UseFnReturn,
                 {
@@ -113,7 +113,7 @@ macro_rules! py_class_dependant {
                     PyClass(Arc::new(Mutex::new(inst)))
                 }
 
-                pub fn use_inst<UseFn, UseFnReturn>(&self, use_fn: UseFn) -> UseFnReturn
+                pub fn lock<UseFn, UseFnReturn>(&self, use_fn: UseFn) -> UseFnReturn
                 where
                     UseFn: FnOnce(&super::$RustType<'static>) -> UseFnReturn,
                 {
