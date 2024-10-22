@@ -1,6 +1,7 @@
 # py-diffsol
 
-Python wrapper for martinjrobins diffsol ODE solver library
+Python wrapper for [martinjrobins/diffsol](https://github.com/martinjrobins/diffsol)
+ODE solver library.
 
 ## Usage
 
