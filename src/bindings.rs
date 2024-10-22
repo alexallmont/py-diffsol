@@ -93,7 +93,7 @@ impl py_builder::PyClass {
         Self::new_binding(RefCell::new(diffsol::OdeBuilder::new()))
     }
 
-    pub fn t0<'py>(slf: PyRefMut<'py, Self>, t0: f64) -> PyRefMut<'py, Self> {
+    pub fn t0<'py>(slf: PyRefMut<'py, Self>, t0: T) -> PyRefMut<'py, Self> {
         apply_builder_fn(slf, |t| t.t0(t0))
     }
 
@@ -105,19 +105,19 @@ impl py_builder::PyClass {
         apply_builder_fn(slf, |t| t.sensitivities_error_control(sensitivities_error_control))
     }
 
-    pub fn h0<'py>(slf: PyRefMut<'py, Self>, h0: f64) -> PyRefMut<'py, Self> {
+    pub fn h0<'py>(slf: PyRefMut<'py, Self>, h0: T) -> PyRefMut<'py, Self> {
         apply_builder_fn(slf, |t| t.h0(h0))
     }
 
-    pub fn rtol<'py>(slf: PyRefMut<'py, Self>, rtol: f64) -> PyRefMut<'py, Self> {
+    pub fn rtol<'py>(slf: PyRefMut<'py, Self>, rtol: T) -> PyRefMut<'py, Self> {
         apply_builder_fn(slf, |t| t.rtol(rtol))
     }
 
-    pub fn atol<'py>(slf: PyRefMut<'py, Self>, atol: Vec<f64>) -> PyRefMut<'py, Self> {
+    pub fn atol<'py>(slf: PyRefMut<'py, Self>, atol: Vec<T>) -> PyRefMut<'py, Self> {
         apply_builder_fn(slf, |t| t.atol(atol.to_vec()))
     }
 
-    pub fn p<'py>(slf: PyRefMut<'py, Self>, p: Vec<f64>) -> PyRefMut<'py, Self> {
+    pub fn p<'py>(slf: PyRefMut<'py, Self>, p: Vec<T>) -> PyRefMut<'py, Self> {
         apply_builder_fn(slf, |t| t.p(p.to_vec()))
     }
 

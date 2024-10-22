@@ -65,7 +65,7 @@ macro_rules! solver_class {
                 slf: PyRefMut<'py, Self>,
                 problem: &py_problem::PyClass,
                 final_time: T
-            ) -> PyResult<(Bound<'py, PyList>, Bound<'py, PyArray1<f64>>)> {
+            ) -> PyResult<(Bound<'py, PyList>, Bound<'py, PyArray1<T>>)> {
                 slf.lock(|solver| {
                     problem.lock(|prb| {
                         let (y, t) = solver.borrow_mut().solve(
