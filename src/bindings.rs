@@ -8,7 +8,7 @@ use pyo3::{
     types::PyList,
 };
 use diffsol::OdeSolverMethod;
-use numpy::PyArray1;
+use numpy::{PyArray1, PyReadonlyArray1};
 
 use crate::solver_class;
 
@@ -215,48 +215,130 @@ where
     })
 }
 
+fn lock_solver_state_mut<UseFn>(
+    solver: &mut py_solver_state::PyClass,
+    use_fn: UseFn
+) -> PyResult<()>
+where
+    UseFn: FnOnce(&mut diffsol::OdeSolverState<V>) -> PyResult<()>
+{
+    solver.lock(|state_ref| {
+        match state_ref {
+            SolverState::Bdf(bdf_handle) => {
+                let bdf = bdf_handle.lock().unwrap();
+                let mut solver = bdf.instance.borrow_mut();
+                match solver.state_mut() {
+                    Some(state) => { use_fn(state) },
+                    None => Err(str_err("Bdf solver has no state")),
+                }
+            },
+            SolverState::Sdirk(sdirk_handle) => {
+                let sdirk = sdirk_handle.lock().unwrap();
+                let mut solver = sdirk.instance.borrow_mut();
+                match solver.state_mut() {
+                    Some(state) => { use_fn(state) },
+                    None => Err(str_err("Sdirk solver has no state")),
+                }
+            },
+        }
+    })
+}
+
 #[pymethods]
 impl py_solver_state::PyClass {
+    // Getters. Note that get_ prefix is removed by PyO3
     #[getter]
-    fn y<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<T>>> {
+    fn get_y<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<T>>> {
         lock_solver_state(self, |state| {
             py_convert::v_to_py(&state.y, py)
         })
     }
 
     #[getter]
-    fn dy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<T>>> {
+    fn get_dy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<T>>> {
         lock_solver_state(self, |state| {
             py_convert::v_to_py(&state.dy, py)
         })
     }
 
     #[getter]
-    fn s<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
+    fn get_s<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
         lock_solver_state(self, |state| {
             py_convert::vec_v_to_py(&state.s, py)
         })
     }
 
     #[getter]
-    fn ds<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
+    fn get_ds<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
         lock_solver_state(self, |state| {
             py_convert::vec_v_to_py(&state.ds, py)
         })
     }
 
     #[getter]
-    fn t<'py>(&self) -> PyResult<f64> {
+    fn t<'py>(&self) -> PyResult<T> {
         lock_solver_state(self, |state| {
             state.t
         })
     }
 
     #[getter]
-    fn h<'py>(&self) -> PyResult<f64> {
+    fn h<'py>(&self) -> PyResult<T> {
         lock_solver_state(self, |state| {
             state.h
         })
+    }
+
+    // Setters. Note that set_ prefix is removed by PyO3
+    #[setter]
+    fn set_y<'py>(&mut self, y: PyReadonlyArray1<'py, T>) -> PyResult<()> {
+        lock_solver_state_mut(self, |state| {
+            py_convert::set_v_from_py(&mut state.y, &y)
+        })
+    }
+
+    #[setter]
+    fn set_dy<'py>(&mut self, dy: PyReadonlyArray1<'py, T>) -> PyResult<()> {
+        lock_solver_state_mut(self, |state| {
+            py_convert::set_v_from_py(&mut state.dy, &dy)
+        })
+    }
+
+    #[setter]
+    fn set_s<'py>(&mut self, s: Bound<'py, PyList>) -> PyResult<()> {
+        lock_solver_state_mut(self, |state| {
+            Err(PyValueError::new_err("FIXME - set_s not yet implemented"))
+        })
+    }
+
+    #[setter]
+    fn set_ds<'py>(&mut self, s: Bound<'py, PyList>) -> PyResult<()> {
+        lock_solver_state_mut(self, |state| {
+            Err(PyValueError::new_err("FIXME - set_ds not yet implemented"))
+        })
+    }
+
+    #[setter]
+    fn set_t<'py>(&mut self, t: f64) -> PyResult<()> {
+        lock_solver_state_mut(self, |state| {
+            Err(PyValueError::new_err("FIXME - set_t not yet implemented"))
+        })
+    }
+
+    #[setter]
+    fn set_h<'py>(&mut self, h: f64) -> PyResult<()> {
+        lock_solver_state_mut(self, |state| {
+            Err(PyValueError::new_err("FIXME - set_h not yet implemented"))
+        })
+    }
+
+    fn to_unowned(&self) {
+        // FIXME conversion to a non-referenced state
+    }
+
+    fn from_unowned(&mut self) {
+        // FIXME conversion from a non-referenced state
+        // (the non-referenced state is where the state constructors will live)
     }
 }
 
