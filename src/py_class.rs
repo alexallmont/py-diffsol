@@ -6,7 +6,7 @@
 //! 
 //! This is resolved by using stripping the object lifetimes at compile time
 //! and ensuring that they are valid at runtime by wrapping all types in an
-//! Arc<Mutex> to ensure no two threads access the data at the same time.
+//! Arc Mutex to ensure no two threads access the data at the same time.
 //! 
 //! Classes that have no lifetimes are registered with the `py_class!`,
 //! given the public Python API name for the class, the type of the Rust class

@@ -5,7 +5,7 @@
 ///
 /// This approach could be considered compiler abuse as the implementation sets
 /// the three required values and then pulls in private/bindings.rs which in
-/// turn gets them from super::<name>. This is not pretty but it's the neatest
+/// turn gets them from super::$name. This is not pretty but it's the neatest
 /// approach to coerce templated types into a common suite of module classes for
 /// PyO3 without duplicating a lot of boilerplate and having upcasting issues.
 #[macro_export]
