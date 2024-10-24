@@ -1,11 +1,11 @@
 
 //! Faer to Python conversion methods
-use pyo3::{prelude::*, exceptions::PyValueError, types::PyList};
-use diffsol::{matrix::MatrixCommon, vector::Vector};
-use faer::{col, Col};
-use numpy::{PyArray1, PyReadonlyArray1};
+use pyo3::{prelude::*, types::PyList};
+use diffsol::{matrix::MatrixCommon, vector::Vector, SparseColMat};
+use faer::Col;
+use numpy::{PyArray1, PyArrayMethods, PyReadonlyArray1};
 
-type M = diffsol::SparseColMat<f64>;
+type M = SparseColMat<f64>;
 type T = <M as MatrixCommon>::T;
 type V = <M as MatrixCommon>::V;
 
@@ -24,7 +24,23 @@ pub fn vec_v_to_py<'py>(vec_v: &Vec<V>, py: Python<'py>) -> Bound<'py, PyList> {
 }
 
 pub fn set_v_from_py<'py>(vec_v: &mut Col<T>, py_value: &PyReadonlyArray1<'py, T>) -> PyResult<()> {
-    let slice = py_value.as_slice().map_err(|err| PyValueError::new_err(err))?;
+    let slice = py_value.as_slice()?;
     Col::copy_from_slice(vec_v, slice);
+    Ok(())
+}
+
+pub fn set_vec_v_from_py<'py>(vec_v: &mut Vec<V>, py_list: Bound<'py, PyList>) -> PyResult<()> {
+    // Map all elements out of the list first and use downcast check they are all
+    // valid numpy arrays (any errors will bail out early). collect automatically
+    // extracts the OK value from the result.
+    *vec_v = py_list.iter().map(|py_item| {
+        let py_array = py_item
+            .downcast::<PyArray1<T>>()?
+            .readonly();
+        let slice = py_array.as_slice()?;
+        let mut v = Col::new();
+        Col::copy_from_slice(&mut v, slice);
+        Ok(v)
+    }).collect::<Result<Vec<_>, PyErr>>()?;
     Ok(())
 }

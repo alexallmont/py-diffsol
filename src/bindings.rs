@@ -4,7 +4,7 @@ use std::cell::RefCell;
 use pyo3::{
     prelude::*,
     Bound,
-    exceptions::PyValueError,
+    exceptions::PyRuntimeError,
     types::PyList,
 };
 use diffsol::OdeSolverMethod;
@@ -22,12 +22,12 @@ type Eqn<'a> = diffsol::ode_solver::diffsl::DiffSl<'a, M>;
 
 /// Convert common diffsol errors to PyErrors
 fn diffsol_err(err: diffsol::error::DiffsolError) -> PyErr {
-    PyValueError::new_err(err.to_string())
+    PyRuntimeError::new_err(err.to_string())
 }
 
 /// General helper shorthand for returning custom errors
 fn str_err(err: &str) -> PyErr {
-    PyValueError::new_err(err.to_string())
+    PyRuntimeError::new_err(err.to_string())
 }
 
 
@@ -198,18 +198,24 @@ where
             SolverState::Bdf(bdf_handle) => {
                 let bdf = bdf_handle.lock().unwrap();
                 let solver = bdf.instance.borrow();
-                match solver.state() {
-                    Some(state) => { Ok(use_fn(state)) },
-                    None => Err(str_err("Bdf solver has no state")),
-                }
+                Ok(
+                    use_fn(
+                        solver
+                            .state()
+                            .ok_or(str_err("Bdf solver has no state for getter"))?
+                        )
+                    )
             },
             SolverState::Sdirk(sdirk_handle) => {
                 let sdirk = sdirk_handle.lock().unwrap();
                 let solver = sdirk.instance.borrow();
-                match solver.state() {
-                    Some(state) => { Ok(use_fn(state)) },
-                    None => Err(str_err("Sdirk solver has no state")),
-                }
+                Ok(
+                    use_fn(
+                        solver
+                            .state()
+                            .ok_or(str_err("Sdirk solver has no state for getter"))?
+                        )
+                    )
             },
         }
     })
@@ -227,18 +233,20 @@ where
             SolverState::Bdf(bdf_handle) => {
                 let bdf = bdf_handle.lock().unwrap();
                 let mut solver = bdf.instance.borrow_mut();
-                match solver.state_mut() {
-                    Some(state) => { use_fn(state) },
-                    None => Err(str_err("Bdf solver has no state")),
-                }
+                use_fn(
+                    solver
+                        .state_mut()
+                        .ok_or(str_err("Bdf solver has no state for setter"))?
+                    )
             },
             SolverState::Sdirk(sdirk_handle) => {
                 let sdirk = sdirk_handle.lock().unwrap();
                 let mut solver = sdirk.instance.borrow_mut();
-                match solver.state_mut() {
-                    Some(state) => { use_fn(state) },
-                    None => Err(str_err("Sdirk solver has no state")),
-                }
+                use_fn(
+                    solver
+                        .state_mut()
+                        .ok_or(str_err("Sdirk solver has no state for setter"))?
+                    )
             },
         }
     })
@@ -307,28 +315,30 @@ impl py_solver_state::PyClass {
     #[setter]
     fn set_s<'py>(&mut self, s: Bound<'py, PyList>) -> PyResult<()> {
         lock_solver_state_mut(self, |state| {
-            Err(PyValueError::new_err("FIXME - set_s not yet implemented"))
+            py_convert::set_vec_v_from_py(&mut state.s, s)
         })
     }
 
     #[setter]
-    fn set_ds<'py>(&mut self, s: Bound<'py, PyList>) -> PyResult<()> {
+    fn set_ds<'py>(&mut self, ds: Bound<'py, PyList>) -> PyResult<()> {
         lock_solver_state_mut(self, |state| {
-            Err(PyValueError::new_err("FIXME - set_ds not yet implemented"))
+            py_convert::set_vec_v_from_py(&mut state.ds, ds)
         })
     }
 
     #[setter]
     fn set_t<'py>(&mut self, t: f64) -> PyResult<()> {
         lock_solver_state_mut(self, |state| {
-            Err(PyValueError::new_err("FIXME - set_t not yet implemented"))
+            state.t = t;
+            Ok(())
         })
     }
 
     #[setter]
     fn set_h<'py>(&mut self, h: f64) -> PyResult<()> {
         lock_solver_state_mut(self, |state| {
-            Err(PyValueError::new_err("FIXME - set_h not yet implemented"))
+            state.h = h;
+            Ok(())
         })
     }
 
@@ -399,6 +409,11 @@ solver_class!("Sdirk", Sdirk, py_sdirk, sdirk_constructor);
 // -----------------------------------------------------------------------------
 // Module declaration
 // -----------------------------------------------------------------------------
+#[pyfunction(name="name")]
+fn module_name() -> String {
+    MODULE_NAME.to_string()
+}
+
 pub fn add_to_parent_module(
     parent_module: &Bound<'_, PyModule>
 ) -> PyResult<()> {
@@ -412,5 +427,9 @@ pub fn add_to_parent_module(
 
     // Main docstring coded rather than /// comment because #[pymodule] not used
     m.setattr("__doc__", format!("Wrapper for {} diffsol type", &MODULE_NAME))?;
+
+    // Convenience method for getting module name internally
+    m.add_function(wrap_pyfunction!(module_name, &m)?).unwrap();
+
     parent_module.add_submodule(&m)
 }

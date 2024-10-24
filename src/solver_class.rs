@@ -38,20 +38,14 @@ macro_rules! solver_class {
             // TODO fn interpolate(&self, t: Eqn::T) -> Result<Eqn::V, DiffsolError>;
             // TODO fn interpolate_sens(&self, t: Eqn::T) -> Result<Vec<Eqn::V>, DiffsolError>;
 
-            fn state<'py>(slf: PyRefMut<'py, Self>) -> PyResult<py_solver_state::PyClass> {
-                slf.lock(|solver| {
-                    if solver.borrow().state().is_none() {
-                        Err(str_err("Solver has no state"))
-                    } else {
-                        let result = py_solver_state::PyClass::new_binding(
-                            // Note that $RustType is used here to select SolverState::Bdf
-                            // or SolverState::Sdirk enum depending on solver type so the
-                            // state can be retrieved from the Arc<Mutex<solver>> later.
-                            SolverState::$RustType(slf.0.clone())
-                        );
-                        Ok(result)
-                    }
-                })
+            fn state<'py>(slf: PyRefMut<'py, Self>) -> py_solver_state::PyClass {
+                // State is accessed as direct reference from this solver
+                py_solver_state::PyClass::new_binding(
+                    // Note that $RustType is used here to select SolverState::Bdf
+                    // or SolverState::Sdirk enum depending on solver type so the
+                    // state can be retrieved from the Arc<Mutex<solver>> later.
+                    SolverState::$RustType(slf.0.clone())
+                )
             }
 
             // TODO fn state_mut(&mut self) -> Option<&mut OdeSolverState<Eqn::V>>;
