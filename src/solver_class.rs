@@ -2,7 +2,9 @@
 //! Implemented as macro as this is duplicated for all solver types, and having
 //! a macro generate a separate PyClass for each - instead of using a strategy
 //! pattern, for example - makes better use of PyO3's type system.
-//! Note that problem, take_state and checkpoint methods are ommitted by design.
+//! Note that problem, take_state and checkpoint methods are ommitted by design,
+//! and state_mut is ommitted because in Python all state access is routed via
+//! py_solver_state, e.g. get with s = solver.state, set with solver.state = s.
 
 #[macro_export]
 macro_rules! solver_class {
@@ -38,6 +40,7 @@ macro_rules! solver_class {
             // TODO fn interpolate(&self, t: Eqn::T) -> Result<Eqn::V, DiffsolError>;
             // TODO fn interpolate_sens(&self, t: Eqn::T) -> Result<Vec<Eqn::V>, DiffsolError>;
 
+            #[getter]
             fn state<'py>(slf: PyRefMut<'py, Self>) -> py_solver_state::PyClass {
                 // State is accessed as direct reference from this solver
                 py_solver_state::PyClass::new_binding(
@@ -47,8 +50,6 @@ macro_rules! solver_class {
                     SolverState::$RustType(slf.0.clone())
                 )
             }
-
-            // TODO fn state_mut(&mut self) -> Option<&mut OdeSolverState<Eqn::V>>;
 
             pub fn order<'py>(slf: PyRefMut<'py, Self>) -> u64 {
                 slf.lock(|solver| { solver.borrow().order() }) as u64

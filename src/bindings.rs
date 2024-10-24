@@ -1,6 +1,7 @@
 use super::{MODULE_NAME, Matrix, LinearSolver, py_convert};
 
 use std::cell::RefCell;
+use std::sync::{Arc, Mutex};
 use pyo3::{
     prelude::*,
     Bound,
@@ -182,18 +183,19 @@ impl From<SolverStopReasonT> for SolverStopReason {
 pub enum SolverState {
     Bdf(py_bdf::ArcHandle),
     Sdirk(py_sdirk::ArcHandle),
+    Standalone(Arc<Mutex<RefCell<diffsol::OdeSolverState<V>>>>),
 }
 
 py_class!("SolverState", SolverState, py_solver_state);
 
-fn lock_solver_state<UseFn, UseFnReturn>(
-    solver: &py_solver_state::PyClass,
+fn lock_state<UseFn, UseFnReturn>(
+    solver_state: &py_solver_state::PyClass,
     use_fn: UseFn
 ) -> PyResult<UseFnReturn>
 where
     UseFn: FnOnce(&diffsol::OdeSolverState<V>) -> UseFnReturn
 {
-    solver.lock(|state_ref| {
+    solver_state.lock(|state_ref| {
         match state_ref {
             SolverState::Bdf(bdf_handle) => {
                 let bdf = bdf_handle.lock().unwrap();
@@ -217,18 +219,23 @@ where
                         )
                     )
             },
+            SolverState::Standalone(standalone_handle) => {
+                let guard = standalone_handle.lock().unwrap();
+                let state = &guard.borrow();
+                Ok(use_fn(state))
+            },
         }
     })
 }
 
-fn lock_solver_state_mut<UseFn>(
-    solver: &mut py_solver_state::PyClass,
+fn lock_state_mut<UseFn>(
+    solver_state: &mut py_solver_state::PyClass,
     use_fn: UseFn
 ) -> PyResult<()>
 where
     UseFn: FnOnce(&mut diffsol::OdeSolverState<V>) -> PyResult<()>
 {
-    solver.lock(|state_ref| {
+    solver_state.lock(|state_ref| {
         match state_ref {
             SolverState::Bdf(bdf_handle) => {
                 let bdf = bdf_handle.lock().unwrap();
@@ -248,6 +255,11 @@ where
                         .ok_or(str_err("Sdirk solver has no state for setter"))?
                     )
             },
+            SolverState::Standalone(standalone_handle) => {
+                let guard = standalone_handle.lock().unwrap();
+                let mut state = guard.borrow_mut();
+                use_fn(&mut state)
+            },
         }
     })
 }
@@ -257,42 +269,42 @@ impl py_solver_state::PyClass {
     // Getters. Note that get_ prefix is removed by PyO3
     #[getter]
     fn get_y<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<T>>> {
-        lock_solver_state(self, |state| {
+        lock_state(self, |state| {
             py_convert::v_to_py(&state.y, py)
         })
     }
 
     #[getter]
     fn get_dy<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyArray1<T>>> {
-        lock_solver_state(self, |state| {
+        lock_state(self, |state| {
             py_convert::v_to_py(&state.dy, py)
         })
     }
 
     #[getter]
     fn get_s<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
-        lock_solver_state(self, |state| {
+        lock_state(self, |state| {
             py_convert::vec_v_to_py(&state.s, py)
         })
     }
 
     #[getter]
     fn get_ds<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
-        lock_solver_state(self, |state| {
+        lock_state(self, |state| {
             py_convert::vec_v_to_py(&state.ds, py)
         })
     }
 
     #[getter]
     fn t<'py>(&self) -> PyResult<T> {
-        lock_solver_state(self, |state| {
+        lock_state(self, |state| {
             state.t
         })
     }
 
     #[getter]
     fn h<'py>(&self) -> PyResult<T> {
-        lock_solver_state(self, |state| {
+        lock_state(self, |state| {
             state.h
         })
     }
@@ -300,35 +312,35 @@ impl py_solver_state::PyClass {
     // Setters. Note that set_ prefix is removed by PyO3
     #[setter]
     fn set_y<'py>(&mut self, y: PyReadonlyArray1<'py, T>) -> PyResult<()> {
-        lock_solver_state_mut(self, |state| {
+        lock_state_mut(self, |state| {
             py_convert::set_v_from_py(&mut state.y, &y)
         })
     }
 
     #[setter]
     fn set_dy<'py>(&mut self, dy: PyReadonlyArray1<'py, T>) -> PyResult<()> {
-        lock_solver_state_mut(self, |state| {
+        lock_state_mut(self, |state| {
             py_convert::set_v_from_py(&mut state.dy, &dy)
         })
     }
 
     #[setter]
     fn set_s<'py>(&mut self, s: Bound<'py, PyList>) -> PyResult<()> {
-        lock_solver_state_mut(self, |state| {
+        lock_state_mut(self, |state| {
             py_convert::set_vec_v_from_py(&mut state.s, s)
         })
     }
 
     #[setter]
     fn set_ds<'py>(&mut self, ds: Bound<'py, PyList>) -> PyResult<()> {
-        lock_solver_state_mut(self, |state| {
+        lock_state_mut(self, |state| {
             py_convert::set_vec_v_from_py(&mut state.ds, ds)
         })
     }
 
     #[setter]
     fn set_t<'py>(&mut self, t: f64) -> PyResult<()> {
-        lock_solver_state_mut(self, |state| {
+        lock_state_mut(self, |state| {
             state.t = t;
             Ok(())
         })
@@ -336,19 +348,42 @@ impl py_solver_state::PyClass {
 
     #[setter]
     fn set_h<'py>(&mut self, h: f64) -> PyResult<()> {
-        lock_solver_state_mut(self, |state| {
+        lock_state_mut(self, |state| {
             state.h = h;
             Ok(())
         })
     }
 
-    fn to_unowned(&self) {
-        // FIXME conversion to a non-referenced state
+    // Deep copy of state and all values into a separate state
+    fn copy(&self) -> PyResult<py_solver_state::PyClass> {
+        lock_state(self, |state| {
+            let deep_copy = (*state).clone();
+            let wrapped_copy = Arc::new(Mutex::new(RefCell::new(deep_copy)));
+            py_solver_state::PyClass::new_binding(
+                SolverState::Standalone(wrapped_copy)
+            )
+        })
     }
 
-    fn from_unowned(&mut self) {
-        // FIXME conversion from a non-referenced state
-        // (the non-referenced state is where the state constructors will live)
+    // Deep assign of state from another
+    fn assign(&mut self, other: &Self) -> PyResult<()> {
+        lock_state_mut(self, |state| {
+            lock_state(other, |other_state| {
+                *state = other_state.clone();
+            })?;
+            Ok(())
+        })
+    }
+
+    // Get this state type (reference to Bdf/Sdirk solver or standalone)
+    fn owner_type(&self) -> String {
+        self.lock(|state_ref| {
+            match state_ref {
+                SolverState::Bdf(_) => "Bdf",
+                SolverState::Sdirk(_) => "Sdirk",
+                SolverState::Standalone(_) => "Standalone",
+            }.to_string()
+        })
     }
 }
 
