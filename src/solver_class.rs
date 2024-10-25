@@ -19,13 +19,13 @@ macro_rules! solver_class {
         #[pymethods]
         impl $InterfaceHandle::PyClass {
             #[new]
-            pub fn new() -> $InterfaceHandle::PyClass {
+            pub fn new_solver() -> $InterfaceHandle::PyClass {
                 $InterfaceHandle::PyClass::new_binding(RefCell::new($ConstructorFn()))
             }
 
             // TODO fn set_problem(&mut self, state: OdeSolverState<Eqn::V>, problem: &OdeSolverProblem<Eqn>);
 
-            pub fn step<'py>(slf: PyRefMut<'py, Self>) -> PyResult<SolverStopReason> {
+            pub fn step(slf: PyRefMut<Self>) -> PyResult<SolverStopReason> {
                 slf.lock(|solver| {
                     let state = solver.borrow_mut().step().map_err(diffsol_err)?;
                     Ok(SolverStopReason::from(state))
@@ -37,7 +37,7 @@ macro_rules! solver_class {
             // TODO fn interpolate_sens(&self, t: Eqn::T) -> Result<Vec<Eqn::V>, DiffsolError>;
 
             #[getter]
-            fn state<'py>(slf: PyRefMut<'py, Self>) -> py_solver_state::PyClass {
+            fn state(slf: PyRefMut<Self>) -> py_solver_state::PyClass {
                 // State is accessed as direct reference from this solver
                 py_solver_state::PyClass::new_binding(
                     // Note that $RustType is used here to select SolverState::Bdf
@@ -47,7 +47,7 @@ macro_rules! solver_class {
                 )
             }
 
-            pub fn order<'py>(slf: PyRefMut<'py, Self>) -> u64 {
+            pub fn order(slf: PyRefMut<Self>) -> u64 {
                 slf.lock(|solver| solver.borrow().order()) as u64
             }
 

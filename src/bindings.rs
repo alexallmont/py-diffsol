@@ -68,10 +68,10 @@ py_class!("Builder", Builder, py_builder);
 
 // Helper for fluent builder interface to apply `tx` function to underlying
 // diffsol class. Takes the original value, applies `tx` and replaces with new.
-fn apply_builder_fn<'py, TxFn>(
-    builder: PyRefMut<'py, py_builder::PyClass>,
+fn apply_builder_fn<TxFn>(
+    builder: PyRefMut<py_builder::PyClass>,
     tx_fn: TxFn
-) -> PyRefMut<'py, py_builder::PyClass>
+) -> PyRefMut<py_builder::PyClass>
 where
     TxFn: Fn(diffsol::OdeBuilder) -> diffsol::OdeBuilder
 {
@@ -90,39 +90,39 @@ where
 #[pymethods]
 impl py_builder::PyClass {
     #[new]
-    pub fn new() -> Self {
+    pub fn new_builder() -> Self {
         Self::new_binding(RefCell::new(diffsol::OdeBuilder::new()))
     }
 
-    pub fn t0<'py>(slf: PyRefMut<'py, Self>, t0: T) -> PyRefMut<'py, Self> {
+    pub fn t0(slf: PyRefMut<Self>, t0: T) -> PyRefMut<Self> {
         apply_builder_fn(slf, |t| t.t0(t0))
     }
 
-    pub fn sensitivities<'py>(slf: PyRefMut<'py, Self>, sensitivities: bool) -> PyRefMut<'py, Self> {
+    pub fn sensitivities(slf: PyRefMut<Self>, sensitivities: bool) -> PyRefMut<Self> {
         apply_builder_fn(slf, |t| t.sensitivities(sensitivities))
     }
 
-    pub fn sensitivities_error_control<'py>(slf: PyRefMut<'py, Self>, sensitivities_error_control: bool) -> PyRefMut<'py, Self> {
+    pub fn sensitivities_error_control(slf: PyRefMut<Self>, sensitivities_error_control: bool) -> PyRefMut<Self> {
         apply_builder_fn(slf, |t| t.sensitivities_error_control(sensitivities_error_control))
     }
 
-    pub fn h0<'py>(slf: PyRefMut<'py, Self>, h0: T) -> PyRefMut<'py, Self> {
+    pub fn h0(slf: PyRefMut<Self>, h0: T) -> PyRefMut<Self> {
         apply_builder_fn(slf, |t| t.h0(h0))
     }
 
-    pub fn rtol<'py>(slf: PyRefMut<'py, Self>, rtol: T) -> PyRefMut<'py, Self> {
+    pub fn rtol(slf: PyRefMut<Self>, rtol: T) -> PyRefMut<Self> {
         apply_builder_fn(slf, |t| t.rtol(rtol))
     }
 
-    pub fn atol<'py>(slf: PyRefMut<'py, Self>, atol: Vec<T>) -> PyRefMut<'py, Self> {
+    pub fn atol(slf: PyRefMut<Self>, atol: Vec<T>) -> PyRefMut<Self> {
         apply_builder_fn(slf, |t| t.atol(atol.to_vec()))
     }
 
-    pub fn p<'py>(slf: PyRefMut<'py, Self>, p: Vec<T>) -> PyRefMut<'py, Self> {
+    pub fn p(slf: PyRefMut<Self>, p: Vec<T>) -> PyRefMut<Self> {
         apply_builder_fn(slf, |t| t.p(p.to_vec()))
     }
 
-    pub fn use_coloring<'py>(slf: PyRefMut<'py, Self>, use_coloring: bool) -> PyRefMut<'py, Self> {
+    pub fn use_coloring(slf: PyRefMut<Self>, use_coloring: bool) -> PyRefMut<Self> {
         apply_builder_fn(slf, |t| t.use_coloring(use_coloring))
     }
 
@@ -296,14 +296,14 @@ impl py_solver_state::PyClass {
     }
 
     #[getter]
-    fn t<'py>(&self) -> PyResult<T> {
+    fn t(&self) -> PyResult<T> {
         lock_state(self, |state| {
             state.t
         })
     }
 
     #[getter]
-    fn h<'py>(&self) -> PyResult<T> {
+    fn h(&self) -> PyResult<T> {
         lock_state(self, |state| {
             state.h
         })
@@ -311,35 +311,35 @@ impl py_solver_state::PyClass {
 
     // Setters. Note that set_ prefix is removed by PyO3
     #[setter]
-    fn set_y<'py>(&mut self, y: PyReadonlyArray1<'py, T>) -> PyResult<()> {
+    fn set_y(&mut self, y: PyReadonlyArray1<T>) -> PyResult<()> {
         lock_state_mut(self, |state| {
             py_convert::set_v_from_py(&mut state.y, &y)
         })
     }
 
     #[setter]
-    fn set_dy<'py>(&mut self, dy: PyReadonlyArray1<'py, T>) -> PyResult<()> {
+    fn set_dy(&mut self, dy: PyReadonlyArray1<T>) -> PyResult<()> {
         lock_state_mut(self, |state| {
             py_convert::set_v_from_py(&mut state.dy, &dy)
         })
     }
 
     #[setter]
-    fn set_s<'py>(&mut self, s: Bound<'py, PyList>) -> PyResult<()> {
+    fn set_s(&mut self, s: Bound<PyList>) -> PyResult<()> {
         lock_state_mut(self, |state| {
             py_convert::set_vec_v_from_py(&mut state.s, s)
         })
     }
 
     #[setter]
-    fn set_ds<'py>(&mut self, ds: Bound<'py, PyList>) -> PyResult<()> {
+    fn set_ds(&mut self, ds: Bound<PyList>) -> PyResult<()> {
         lock_state_mut(self, |state| {
             py_convert::set_vec_v_from_py(&mut state.ds, ds)
         })
     }
 
     #[setter]
-    fn set_t<'py>(&mut self, t: f64) -> PyResult<()> {
+    fn set_t(&mut self, t: f64) -> PyResult<()> {
         lock_state_mut(self, |state| {
             state.t = t;
             Ok(())
@@ -347,7 +347,7 @@ impl py_solver_state::PyClass {
     }
 
     #[setter]
-    fn set_h<'py>(&mut self, h: f64) -> PyResult<()> {
+    fn set_h(&mut self, h: f64) -> PyResult<()> {
         lock_state_mut(self, |state| {
             state.h = h;
             Ok(())
@@ -452,7 +452,7 @@ fn module_name() -> String {
 pub fn add_to_parent_module(
     parent_module: &Bound<'_, PyModule>
 ) -> PyResult<()> {
-    let m = PyModule::new_bound(parent_module.py(), &MODULE_NAME)?;
+    let m = PyModule::new_bound(parent_module.py(), MODULE_NAME)?;
 
     m.add_class::<py_context::PyClass>()?;
     m.add_class::<py_problem::PyClass>()?;
@@ -461,7 +461,7 @@ pub fn add_to_parent_module(
     m.add_class::<py_sdirk::PyClass>()?;
 
     // Main docstring coded rather than /// comment because #[pymodule] not used
-    m.setattr("__doc__", format!("Wrapper for {} diffsol type", &MODULE_NAME))?;
+    m.setattr("__doc__", format!("Wrapper for {} diffsol type", MODULE_NAME))?;
 
     // Convenience method for getting module name internally
     m.add_function(wrap_pyfunction!(module_name, &m)?).unwrap();

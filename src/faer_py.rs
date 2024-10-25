@@ -16,7 +16,7 @@ pub fn vec_t_to_py<'py>(vec_t: &Vec<T>, py: Python<'py>) -> Bound<'py, PyArray1<
     PyArray1::from_slice_bound(py, vec_t.as_slice())
 }
 
-pub fn vec_v_to_py<'py>(vec_v: &Vec<V>, py: Python<'py>) -> Bound<'py, PyList> {
+pub fn vec_v_to_py<'py>(vec_v: &[V], py: Python<'py>) -> Bound<'py, PyList> {
     PyList::new_bound(
         py,
         vec_v
@@ -25,13 +25,13 @@ pub fn vec_v_to_py<'py>(vec_v: &Vec<V>, py: Python<'py>) -> Bound<'py, PyList> {
     )
 }
 
-pub fn set_v_from_py<'py>(vec_v: &mut Col<T>, py_value: &PyReadonlyArray1<'py, T>) -> PyResult<()> {
+pub fn set_v_from_py(vec_v: &mut Col<T>, py_value: &PyReadonlyArray1<T>) -> PyResult<()> {
     let slice = py_value.as_slice()?;
     Col::copy_from_slice(vec_v, slice);
     Ok(())
 }
 
-pub fn set_vec_v_from_py<'py>(vec_v: &mut Vec<V>, py_list: Bound<'py, PyList>) -> PyResult<()> {
+pub fn set_vec_v_from_py(vec_v: &mut Vec<V>, py_list: Bound<PyList>) -> PyResult<()> {
     // Map all elements out of the list first and use downcast check they are all
     // valid numpy arrays (any errors will bail out early). collect automatically
     // extracts the OK value from the result.

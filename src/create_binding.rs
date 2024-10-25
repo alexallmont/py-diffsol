@@ -27,7 +27,9 @@ macro_rules! create_binding {
             type Matrix = $matrix_type;
             type LinearSolver<Op> = $solver_type<Op>;
 
-            // bindings accesses above values and types via super::
+            // Duplicate modules warning disabled as this is repeatedly loaded
+            // by lib.rs to bring in above values and types via super::
+            #[allow(clippy::duplicate_mod)]
             mod bindings;
             pub use bindings::*;
         }
