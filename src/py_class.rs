@@ -3,23 +3,23 @@
 //! A common problem for PyO3 is that it can't expose native rust classes that
 //! have lifetimes because in a garbage-collected system there is no guarantee
 //! on the destruction order of objects.
-//! 
+//!
 //! This is resolved by using stripping the object lifetimes at compile time
 //! and ensuring that they are valid at runtime by wrapping all types in an
 //! Arc Mutex to ensure no two threads access the data at the same time.
-//! 
+//!
 //! Classes that have no lifetimes are registered with the `py_class!`,
 //! given the public Python API name for the class, the type of the Rust class
 //! it needs to store, and an 'interface handle' which is the internal type
 //! (actually a module under the hood) that wraps up the internals in Rust.
-//! 
+//!
 //! Register lifetime classes with `py_class_dependant!`. This takes a fourth
 //! argument of the instance handle of the class that 'owns' this lifetime, i.e.
 //! the one that this new class depends on. The type names are passed without
 //! their lifetime parameters. Complex generic types may need type aliases so
 //! the macro implementation can handle the `tt` type, which does not allow
 //! generic parameters.
-//! 
+//!
 //! The implementation works by the `ref_class` cloning the Arc of the owning
 //! object. The clone increases the reference count on the owning object so it
 //! cannot be destroyed until the ref_class has released it; effectively, it is
@@ -35,8 +35,8 @@ macro_rules! py_class {
         $InterfaceHandle:tt
     ) => {
         pub mod $InterfaceHandle {
-            use std::sync::{Arc, Mutex};
             use pyo3::prelude::*;
+            use std::sync::{Arc, Mutex};
 
             pub struct RustInstance {
                 pub instance: super::$RustType,
@@ -48,11 +48,8 @@ macro_rules! py_class {
             pub struct PyClass(pub ArcHandle);
 
             impl PyClass {
-                pub fn new_binding(instance: super::$RustType) -> PyClass
-                {
-                    let inst = super::$InterfaceHandle::RustInstance {
-                        instance
-                    };
+                pub fn new_binding(instance: super::$RustType) -> PyClass {
+                    let inst = super::$InterfaceHandle::RustInstance { instance };
 
                     PyClass(Arc::new(Mutex::new(inst)))
                 }
@@ -79,8 +76,8 @@ macro_rules! py_class_dependant {
         $OwnerHandle:tt
     ) => {
         pub mod $InterfaceHandle {
-            use std::sync::{Arc, Mutex};
             use pyo3::prelude::*;
+            use std::sync::{Arc, Mutex};
 
             pub type DependsOnType = Arc<Mutex<super::$OwnerHandle::RustInstance>>;
             pub struct RustInstance {
@@ -95,19 +92,18 @@ macro_rules! py_class_dependant {
             impl PyClass {
                 pub fn new_binding(
                     instance: super::$RustType,
-                    depends_on: DependsOnType
+                    depends_on: DependsOnType,
                 ) -> PyClass {
                     // To circumvent lifetime errors the dependant class is
                     // passed around as a static instance. The lifetime is
                     // instead guaranteed by `depends_on` existing long enough
                     // by reference count.
-                    let instance: super::$RustType<'static> = unsafe {
-                        std::mem::transmute(instance)
-                    };
+                    let instance: super::$RustType<'static> =
+                        unsafe { std::mem::transmute(instance) };
 
                     let inst = super::$InterfaceHandle::RustInstance {
                         instance,
-                        depends_on
+                        depends_on,
                     };
 
                     PyClass(Arc::new(Mutex::new(inst)))

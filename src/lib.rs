@@ -3,10 +3,10 @@ use pyo3::prelude::*;
 #[macro_use]
 mod py_class;
 
-mod solver_class;
 mod create_binding;
-mod nalgebra_py;
 mod faer_py;
+mod nalgebra_py;
+mod solver_class;
 
 // nalgebra_dense_lu_f64 binding
 type MatrixNaLu = nalgebra::DMatrix<f64>;
@@ -24,7 +24,7 @@ type SolverFaKlu<Op> = diffsol::KLU<MatrixFaKlu, Op>;
 create_binding!(faer_sparse_klu_f64, MatrixFaKlu, SolverFaKlu, faer_py);
 
 /// Top-level typed diffsol bindings
-#[pymodule(name="diffsol")]
+#[pymodule(name = "diffsol")]
 fn py_diffsol(m: &Bound<'_, PyModule>) -> PyResult<()> {
     nalgebra_dense_lu_f64::add_to_parent_module(m)?;
     faer_sparse_lu_f64::add_to_parent_module(m)?;
