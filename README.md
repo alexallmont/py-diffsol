@@ -1,6 +1,6 @@
 # py-diffsol
 
-Python wrapper for martinjrobins diffsol ODE solver library
+**Warning: this code has been deprecated. Please use the new [pydiffsol](github.com/alexallmont/pydiffsol) bindings instead.**
 
 ## Usage
 
